@@ -355,3 +355,6 @@ data/
 
 # VS Code
 .vscode/
+
+.DS_Store
+._.DS_Store

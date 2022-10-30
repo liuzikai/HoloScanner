@@ -35,6 +35,8 @@ public class TCPClient : MonoBehaviour
         get { return connected; }
     }
 
+    public ResearchModeVideoStream videoStream;
+
 #if WINDOWS_UWP
     StreamSocket socket = null;
     public DataWriter dw;
@@ -63,6 +65,8 @@ public class TCPClient : MonoBehaviour
 
     private void StopCoonection()
     {
+        if (videoStream.AHATRecording) videoStream.ToggleAHATRecordingEvent();
+
         dw?.DetachStream();
         dw?.Dispose();
         dw = null;
@@ -73,6 +77,7 @@ public class TCPClient : MonoBehaviour
 
         socket?.Dispose();
         connected = false;
+        ConnectionStatusLED.material.color = Color.red;
     }
 
     bool lastMessageSent = true;
