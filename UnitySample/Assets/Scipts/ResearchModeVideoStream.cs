@@ -64,8 +64,15 @@ public class ResearchModeVideoStream : MonoBehaviour
     Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
 #endif
 
+    public Renderer ahatRecordingLED;
+    private bool ahatRecording = false;
+    public bool AHATRecording {
+        get { return ahatRecording; }
+    }
+
     private void Awake()
     {
+        ahatRecordingLED.material.color = Color.red;
 #if ENABLE_WINMD_SUPPORT
 #if UNITY_2020_1_OR_NEWER // note: Unity 2021.2 and later not supported
         IntPtr WorldOriginPtr = UnityEngine.XR.WindowsMR.WindowsMREnvironment.OriginSpatialCoordinateSystem;
@@ -162,10 +169,17 @@ public class ResearchModeVideoStream : MonoBehaviour
     void LateUpdate()
     {
 #if ENABLE_WINMD_SUPPORT
+        bool ahatUpdated = false;
+        // DepthMapTextureUpdated() and ShortAbImageTextureUpdated() are set to true at the same time.
+        // HL2UnityPlugin/HL2ResearchMode.cpp:342
+        // As m_depthMapTextureUpdated is set later then m_shortAbImageTextureUpdated, we use it as the flag
+        // to avoid aync problem.
+
         // update depth map texture
         if (depthSensorMode == DepthSensorMode.ShortThrow && startRealtimePreview && 
             depthPreviewPlane != null && researchMode.DepthMapTextureUpdated())
         {
+            ahatUpdated = true;
             byte[] frameTexture = researchMode.GetDepthMapTextureBuffer();
             if (frameTexture.Length > 0)
             {
@@ -187,6 +201,7 @@ public class ResearchModeVideoStream : MonoBehaviour
         if (depthSensorMode == DepthSensorMode.ShortThrow && startRealtimePreview && 
             shortAbImagePreviewPlane != null && researchMode.ShortAbImageTextureUpdated())
         {
+            // not updating ahatUpdated, see above
             byte[] frameTexture = researchMode.GetShortAbImageTextureBuffer();
             if (frameTexture.Length > 0)
             {
@@ -202,6 +217,10 @@ public class ResearchModeVideoStream : MonoBehaviour
                 shortAbImageMediaTexture.LoadRawTextureData(shortAbImageFrameData);
                 shortAbImageMediaTexture.Apply();
             }
+        }
+
+        if (ahatRecording && ahatUpdated) {
+            SaveAHATSensorDataEvent();
         }
 
         // update long depth map texture
@@ -312,7 +331,12 @@ public class ResearchModeVideoStream : MonoBehaviour
                 {
                     pointCloudVector3[i] = new Vector3(pointCloud[3 * i], pointCloud[3 * i + 1], pointCloud[3 * i + 2]);
                 }
-                text.text = "Point Cloud Length: " + pointCloudVector3.Length.ToString();
+                if (depthSensorMode == DepthSensorMode.ShortThrow) {
+                    text.text = "Short-Throw ";
+                } else if (depthSensorMode == DepthSensorMode.LongThrow) {
+                    text.text = "Long-Throw ";
+                }
+                text.text += "Point Cloud Length: " + pointCloudVector3.Length.ToString();
                 pointCloudRenderer.Render(pointCloudVector3, pointColor);
             }
         }
@@ -346,6 +370,19 @@ public class ResearchModeVideoStream : MonoBehaviour
         researchMode.StopAllSensorDevice();
 #endif
         startRealtimePreview = false;
+    }
+
+    public void ToggleAHATRecordingEvent() {
+        if (!ahatRecording) {
+            if (tcpClient.Connected) {
+                ahatRecording = true;
+                ahatRecordingLED.material.color = Color.green;
+            }
+            
+        } else {
+            ahatRecording = false;
+            ahatRecordingLED.material.color = Color.red;
+        }
     }
 
     public void SaveAHATSensorDataEvent()
