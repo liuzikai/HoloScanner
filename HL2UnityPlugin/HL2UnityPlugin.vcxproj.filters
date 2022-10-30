@@ -13,11 +13,13 @@
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
     <ClCompile Include="TimeConverter.cpp" />
+    <ClCompile Include="HL2Cannon.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="ResearchModeApi.h" />
     <ClInclude Include="TimeConverter.h" />
+    <ClInclude Include="HL2Cannon.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="HL2UnityPlugin.def" />
@@ -31,5 +33,6 @@
   </ItemGroup>
   <ItemGroup>
     <Midl Include="HL2ResearchMode.idl" />
+    <Midl Include="HL2Cannon.idl" />
   </ItemGroup>
 </Project>

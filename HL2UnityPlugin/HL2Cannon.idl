@@ -1,0 +1,11 @@
+namespace HL2UnityPlugin
+{
+    runtimeclass HL2Cannon
+    {
+        HL2Cannon();
+
+        void StartUpdateLoop();
+        
+        void StopUpdateLoop();
+    }
+}

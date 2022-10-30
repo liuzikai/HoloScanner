@@ -119,6 +119,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="HL2Cannon.h"> 
+      <DependentUpon>HL2Cannon.idl</DependentUpon>
+    </ClInclude>
     <ClInclude Include="pch.h" />
     <ClInclude Include="HL2ResearchMode.h">
       <DependentUpon>HL2ResearchMode.idl</DependentUpon>
@@ -127,6 +130,9 @@
     <ClInclude Include="TimeConverter.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="HL2Cannon.cpp"> 
+      <DependentUpon>HL2Cannon.idl</DependentUpon>
+    </ClCompile>
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
@@ -139,6 +145,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <Midl Include="HL2Cannon.idl" />
     <Midl Include="HL2ResearchMode.idl" />
   </ItemGroup>
   <ItemGroup>
