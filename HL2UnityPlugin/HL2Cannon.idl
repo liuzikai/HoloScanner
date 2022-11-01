@@ -1,7 +1,7 @@
 namespace HL2UnityPlugin
 {
     // XMVECTOR in DirectX
-    struct XMVECTOR 
+    struct Vector4 
     {
         Single x;
         Single y;
@@ -10,7 +10,7 @@ namespace HL2UnityPlugin
     };
 
     // XMMATRIX in DirectX
-    struct XMMATRIX 
+    struct Matrix44 
     {
         Single _11;
         Single _12;
@@ -76,17 +76,17 @@ namespace HL2UnityPlugin
         void StopUpdateLoop();
 
         // Head tracking (class TrackedHands)
-        XMMATRIX GetHeadTransform();
+        Matrix44 GetHeadTransform();
 
         // Hand tracking (class TrackedHands)
         Boolean IsHandTracked(HandIndex handIndex);
-        XMVECTOR GetJoint(HandIndex handIndex, HandJointIndex jointIndex);
-	    XMVECTOR GetJointOrientation(HandIndex handIndex, HandJointIndex jointIndex);	// XMVECTOR is a quaternion in this case
-        XMMATRIX GetOrientedJoint(HandIndex handIndex, HandJointIndex jointIndex);
+        Vector4 GetJoint(HandIndex handIndex, HandJointIndex jointIndex);
+	    Vector4 GetJointOrientation(HandIndex handIndex, HandJointIndex jointIndex);	// Vector4 is a quaternion in this case
+        Matrix44 GetOrientedJoint(HandIndex handIndex, HandJointIndex jointIndex);
         
         // Eye tracking (class MixedReality)
         Boolean IsEyeTrackingActive();
-        XMVECTOR GetEyeGazeOrigin();
-	    XMVECTOR GetEyeGazeDirection();
+        Vector4 GetEyeGazeOrigin();
+	    Vector4 GetEyeGazeDirection();
     }
 }

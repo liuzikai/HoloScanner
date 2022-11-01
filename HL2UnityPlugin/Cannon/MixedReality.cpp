@@ -11,16 +11,12 @@
 // Author: Casey Meekhof cmeekhof@microsoft.com
 
 
+#include "pch.h"
 #include "MixedReality.h"
 #include "Common/Timer.h"
 #include "Common/FileUtilities.h"
 
 #include <windows.graphics.directx.direct3d11.interop.h>
-#include <winrt/Windows.Foundation.h>
-#include <winrt/Windows.Foundation.Metadata.h>
-#include <winrt/Windows.Foundation.Collections.h>
-#include <winrt/Windows.Storage.Streams.h>
-#include <winrt/Windows.Perception.Spatial.Preview.h>
 #include <robuffer.h>
 #include <WindowsNumerics.h>
 

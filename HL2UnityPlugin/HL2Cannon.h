@@ -1,10 +1,6 @@
 #pragma once
 #include "HL2Cannon.g.h"
 
-// Note: Remove this static_assert after copying these generated source files to your project.
-// This assertion exists to avoid compiling these generated source files directly.
-static_assert(false, "Do not compile generated C++/WinRT source files directly");
-
 namespace winrt::HL2UnityPlugin::implementation
 {
     struct HL2Cannon : HL2CannonT<HL2Cannon>
@@ -13,6 +9,14 @@ namespace winrt::HL2UnityPlugin::implementation
 
         void StartUpdateLoop();
         void StopUpdateLoop();
+        HL2UnityPlugin::Matrix44 GetHeadTransform();
+        bool IsHandTracked(HL2UnityPlugin::HandIndex const& handIndex);
+        HL2UnityPlugin::Vector4 GetJoint(HL2UnityPlugin::HandIndex const& handIndex, HL2UnityPlugin::HandJointIndex const& jointIndex);
+        HL2UnityPlugin::Vector4 GetJointOrientation(HL2UnityPlugin::HandIndex const& handIndex, HL2UnityPlugin::HandJointIndex const& jointIndex);
+        HL2UnityPlugin::Matrix44 GetOrientedJoint(HL2UnityPlugin::HandIndex const& handIndex, HL2UnityPlugin::HandJointIndex const& jointIndex);
+        bool IsEyeTrackingActive();
+        HL2UnityPlugin::Vector4 GetEyeGazeOrigin();
+        HL2UnityPlugin::Vector4 GetEyeGazeDirection();
     };
 }
 namespace winrt::HL2UnityPlugin::factory_implementation

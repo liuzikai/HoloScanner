@@ -2,10 +2,6 @@
 #include "HL2Cannon.h"
 #include "HL2Cannon.g.cpp"
 
-// Note: Remove this static_assert after copying these generated source files to your project.
-// This assertion exists to avoid compiling these generated source files directly.
-static_assert(false, "Do not compile generated C++/WinRT source files directly");
-
 namespace winrt::HL2UnityPlugin::implementation
 {
     void HL2Cannon::StartUpdateLoop()
@@ -13,6 +9,38 @@ namespace winrt::HL2UnityPlugin::implementation
         throw hresult_not_implemented();
     }
     void HL2Cannon::StopUpdateLoop()
+    {
+        throw hresult_not_implemented();
+    }
+    HL2UnityPlugin::Matrix44 HL2Cannon::GetHeadTransform()
+    {
+        throw hresult_not_implemented();
+    }
+    bool HL2Cannon::IsHandTracked(HL2UnityPlugin::HandIndex const& handIndex)
+    {
+        throw hresult_not_implemented();
+    }
+    HL2UnityPlugin::Vector4 HL2Cannon::GetJoint(HL2UnityPlugin::HandIndex const& handIndex, HL2UnityPlugin::HandJointIndex const& jointIndex)
+    {
+        throw hresult_not_implemented();
+    }
+    HL2UnityPlugin::Vector4 HL2Cannon::GetJointOrientation(HL2UnityPlugin::HandIndex const& handIndex, HL2UnityPlugin::HandJointIndex const& jointIndex)
+    {
+        throw hresult_not_implemented();
+    }
+    HL2UnityPlugin::Matrix44 HL2Cannon::GetOrientedJoint(HL2UnityPlugin::HandIndex const& handIndex, HL2UnityPlugin::HandJointIndex const& jointIndex)
+    {
+        throw hresult_not_implemented();
+    }
+    bool HL2Cannon::IsEyeTrackingActive()
+    {
+        throw hresult_not_implemented();
+    }
+    HL2UnityPlugin::Vector4 HL2Cannon::GetEyeGazeOrigin()
+    {
+        throw hresult_not_implemented();
+    }
+    HL2UnityPlugin::Vector4 HL2Cannon::GetEyeGazeDirection()
     {
         throw hresult_not_implemented();
     }
