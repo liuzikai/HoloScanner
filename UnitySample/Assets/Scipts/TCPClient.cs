@@ -88,7 +88,7 @@ public class TCPClient : MonoBehaviour
         try
         {
             // Write header
-            dw.WriteString("s"); // header "s" 
+            dw.WriteString("d"); // header
 
             // Write point cloud
             dw.WriteInt32(data.Length);
@@ -121,6 +121,31 @@ public class TCPClient : MonoBehaviour
             // Write actual data
             dw.WriteBytes(UINT16ToBytes(data1));
             dw.WriteBytes(UINT16ToBytes(data2));
+
+            // Send out
+            await dw.StoreAsync();
+            await dw.FlushAsync();
+        }
+        catch (Exception ex)
+        {
+            SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
+            Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
+        }
+        lastMessageSent = true;
+    }
+
+    public async void SendFloatAsync(float[] data)
+    {
+        if (!lastMessageSent) return;
+        lastMessageSent = false;
+        try
+        {
+            // Write header
+            dw.WriteString("r"); // header
+
+            // Write point cloud
+            dw.WriteInt32(data.Length);
+            dw.WriteBytes(FloatToBytes(data));
 
             // Send out
             await dw.StoreAsync();
@@ -203,6 +228,12 @@ public class TCPClient : MonoBehaviour
         byte[] ushortInBytes = new byte[data.Length * sizeof(ushort)];
         System.Buffer.BlockCopy(data, 0, ushortInBytes, 0, ushortInBytes.Length);
         return ushortInBytes;
+    }
+    byte[] FloatToBytes(float[] data)
+    {
+        byte[] floatInBytes = new byte[data.Length * sizeof(float)];
+        System.Buffer.BlockCopy(data, 0, floatInBytes, 0, floatInBytes.Length);
+        return floatInBytes;
     }
     #endregion
 

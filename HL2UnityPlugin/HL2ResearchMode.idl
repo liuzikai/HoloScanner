@@ -12,6 +12,8 @@ namespace HL2UnityPlugin
         UInt16[] GetLongAbImageBuffer();
         UInt8[] GetLongAbImageTextureBuffer();
         Single[] GetPointCloudBuffer();
+        Single[] GetRigToWorldBuffer();  // float4x4
+        Windows.Perception.PerceptionTimestamp GetDepthUpdateTimestamp();
 
         UInt16[] GetLongDepthMapBuffer();
         UInt8[] GetLongDepthMapTextureBuffer();
@@ -28,6 +30,9 @@ namespace HL2UnityPlugin
         Single[] GetCenterPoint();
         Int32 GetDepthBufferSize();
         Int32 GetLongDepthBufferSize();
+        Single[] GetDepthExtrinsics();    // float4x4
+        Single[] GetDepthLUT();           // depth resolution width * height * 3
+
         String PrintDepthResolution();
         String PrintDepthExtrinsics();
 		String PrintLFResolution();

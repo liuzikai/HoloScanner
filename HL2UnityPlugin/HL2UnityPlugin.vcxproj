@@ -119,15 +119,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Cannon\AnimatedVector.h" />
-    <ClInclude Include="Cannon\DrawCall.h" />
-    <ClInclude Include="Cannon\FloatingSlate.h" />
-    <ClInclude Include="Cannon\FloatingText.h" />
-    <ClInclude Include="Cannon\MixedReality.h" />
-    <ClInclude Include="Cannon\RecordedValue.h" />
-    <ClInclude Include="Cannon\TrackedHands.h" />
-    <ClInclude Include="HL2Cannon.h">
-      <DependentUpon>HL2Cannon.idl</DependentUpon>
+    <ClInclude Include="HL2Interactions.h">
+      <DependentUpon>HL2Interactions.idl</DependentUpon>
     </ClInclude>
     <ClInclude Include="pch.h" />
     <ClInclude Include="HL2ResearchMode.h">
@@ -137,27 +130,8 @@
     <ClInclude Include="TimeConverter.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Cannon\AnimatedVector.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Cannon\DrawCall.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Cannon\FloatingSlate.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Cannon\FloatingText.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Cannon\MixedReality.cpp" />
-    <ClCompile Include="Cannon\RecordedValue.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="Cannon\TrackedHands.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="HL2Cannon.cpp">
-      <DependentUpon>HL2Cannon.idl</DependentUpon>
+    <ClCompile Include="HL2Interactions.cpp">
+      <DependentUpon>HL2Interactions.idl</DependentUpon>
     </ClCompile>
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
@@ -171,7 +145,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Midl Include="HL2Cannon.idl" />
+    <Midl Include="HL2Interactions.idl" />
     <Midl Include="HL2ResearchMode.idl" />
   </ItemGroup>
   <ItemGroup>

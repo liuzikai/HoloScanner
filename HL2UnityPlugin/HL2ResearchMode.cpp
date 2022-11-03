@@ -184,6 +184,44 @@ namespace winrt::HL2UnityPlugin::implementation
                 pDepthSensorFrame->GetResolution(&resolution);
                 pHL2ResearchMode->m_depthResolution = resolution;
                 
+                // Generate AHaT LUT
+                if (!pHL2ResearchMode->m_depthLUT) {
+                    std::lock_guard<std::mutex> l(pHL2ResearchMode->mu);
+
+                    pHL2ResearchMode->m_depthLUT = new float[(size_t) resolution.Width * (size_t) resolution.Height * 3];
+                    if (!pHL2ResearchMode->m_depthLUT) continue;
+
+                    float uv[2];
+                    float xy[2];
+                    for (size_t y = 0; y < resolution.Height; y++)
+                    {
+                        uv[1] = (y + 0.5f);
+                        for (size_t x = 0; x < resolution.Width; x++)
+                        {
+                            uv[0] = (x + 0.5f);
+                            HRESULT hr = pHL2ResearchMode->m_pDepthCameraSensor->MapImagePointToCameraUnitPlane(uv, xy);
+                            if (FAILED(hr))
+                            {
+                                *pHL2ResearchMode->m_depthLUT++ = xy[0];
+                                *pHL2ResearchMode->m_depthLUT++ = xy[1];
+                                *pHL2ResearchMode->m_depthLUT++ = 0.f;
+                                continue;
+                            }
+                            float z = 1.0f;
+                            const float norm = sqrtf(xy[0] * xy[0] + xy[1] * xy[1] + z * z);
+                            const float invNorm = 1.0f / norm;
+                            xy[0] *= invNorm;
+                            xy[1] *= invNorm;
+                            z *= invNorm;
+
+                            // Dump LUT row
+                            *pHL2ResearchMode->m_depthLUT++ = xy[0];
+                            *pHL2ResearchMode->m_depthLUT++ = xy[1];
+                            *pHL2ResearchMode->m_depthLUT++ = z;
+                        }
+                    }    
+                }
+                
                 IResearchModeSensorDepthFrame* pDepthFrame = nullptr;
                 winrt::check_hresult(pDepthSensorFrame->QueryInterface(IID_PPV_ARGS(&pDepthFrame)));
 
@@ -207,16 +245,13 @@ namespace winrt::HL2UnityPlugin::implementation
 
                 // get tracking transform
                 Windows::Perception::Spatial::SpatialLocation transToWorld = nullptr;
-                if (pHL2ResearchMode->m_reconstructShortThrowPointCloud) 
-                {
-                    auto ts = PerceptionTimestampHelper::FromSystemRelativeTargetTime(HundredsOfNanoseconds(checkAndConvertUnsigned(timestamp.HostTicks)));
-                    transToWorld = pHL2ResearchMode->m_locator.TryLocateAtTimestamp(ts, pHL2ResearchMode->m_refFrame);
-                    if (transToWorld == nullptr) continue;
-                }
-
-                XMMATRIX depthToWorld = XMMatrixIdentity();
-                if (pHL2ResearchMode->m_reconstructShortThrowPointCloud)
-                    depthToWorld = pHL2ResearchMode->m_depthCameraPoseInvMatrix * SpatialLocationToDxMatrix(transToWorld);
+                auto ts = PerceptionTimestampHelper::FromSystemRelativeTargetTime(HundredsOfNanoseconds(checkAndConvertUnsigned(timestamp.HostTicks)));
+                transToWorld = pHL2ResearchMode->m_locator.TryLocateAtTimestamp(ts, pHL2ResearchMode->m_refFrame);
+                // TODO: [Zikai] transToWorld? Is this an accurate name?
+                if (transToWorld == nullptr) continue;
+                
+                XMMATRIX transToWorldMatrix = SpatialLocationToDxMatrix(transToWorld);
+                XMMATRIX depthToWorld = pHL2ResearchMode->m_depthCameraPoseInvMatrix * transToWorldMatrix;
 
                 pHL2ResearchMode->mu.lock();
                 auto roiCenterFloat = XMFLOAT3(pHL2ResearchMode->m_roiCenter[0], pHL2ResearchMode->m_roiCenter[1], pHL2ResearchMode->m_roiCenter[2]);
@@ -338,6 +373,19 @@ namespace winrt::HL2UnityPlugin::implementation
                         pHL2ResearchMode->m_shortAbImageTexture = new UINT8[outBufferCount];
                     }
                     memcpy(pHL2ResearchMode->m_shortAbImageTexture, pAbTexture.get(), outBufferCount * sizeof(UINT8));
+
+                    // save timestamp
+                    pHL2ResearchMode->m_depthTimestamp = timestamp;
+
+                    // save rig2world as matrix
+                    if (!pHL2ResearchMode->m_rigToWorld)
+                    {
+                        OutputDebugString(L"Create Space for short rigToWorld...\n");
+                        pHL2ResearchMode->m_rigToWorld = new float[16];
+                    }
+                    XMMATRIX rigToWorld = XMMatrixTranspose(transToWorldMatrix);
+                    // TODO: [Zikai] transpose is inverse? Here we just simulate what HoloLen2CV does
+                    memcpy(pHL2ResearchMode->m_rigToWorld, &rigToWorld, 16 * sizeof(float));
                 }
                 pHL2ResearchMode->m_shortAbImageTextureUpdated = true;
                 pHL2ResearchMode->m_depthMapTextureUpdated = true;
@@ -1105,6 +1153,18 @@ namespace winrt::HL2UnityPlugin::implementation
 		m_pSensorDevice = nullptr;
 		m_pSensorDeviceConsent->Release();
 		m_pSensorDeviceConsent = nullptr;
+
+        if (m_rigToWorld)
+        {
+            delete[] m_rigToWorld;
+            m_rigToWorld = nullptr;
+        }
+        
+        if (m_depthLUT)
+        {
+            delete[] m_depthLUT;
+            m_depthLUT = nullptr;
+        }
     }
 
     com_array<uint16_t> HL2ResearchMode::GetDepthMapBuffer()
@@ -1386,6 +1446,41 @@ namespace winrt::HL2UnityPlugin::implementation
         auto pos = location.Position();
         auto posMat = XMMatrixTranslation(pos.x, pos.y, pos.z);
         return rotMat * posMat;
+    }
+
+    com_array<float> HL2ResearchMode::GetRigToWorldBuffer()
+    {
+        std::lock_guard<std::mutex> l(mu);
+        if (!m_rigToWorld)
+        {
+            return com_array<float>();
+        }
+        return com_array<float>(std::move_iterator(m_rigToWorld), std::move_iterator(m_rigToWorld + 16));
+        // TODO: [Zikai] why std::move_iterator? on raw pointer?
+    }
+
+    com_array<float> HL2ResearchMode::GetDepthExtrinsics()
+    {
+        std::lock_guard<std::mutex> l(mu);
+        float *f = (float *) &m_depthCameraPoseInvMatrix;
+        // TODO: [Zikai] m_depthCameraPoseInvMatrix?
+        return com_array<float>(f, f + 16);
+    }
+
+    com_array<float> HL2ResearchMode::GetDepthLUT()
+    {
+        std::lock_guard<std::mutex> l(mu);
+        if (!m_depthLUT)
+        {
+            return com_array<float>();
+        }
+        return com_array<float>(m_depthLUT, m_depthLUT + ((size_t) m_depthResolution.Height * (size_t) m_depthResolution.Width * 3));
+    }
+
+    Windows::Perception::PerceptionTimestamp HL2ResearchMode::GetDepthUpdateTimestamp()
+    {
+        std::lock_guard<std::mutex> l(mu);
+        return PerceptionTimestampHelper::FromSystemRelativeTargetTime(HundredsOfNanoseconds(checkAndConvertUnsigned(m_depthTimestamp.HostTicks)));
     }
 
 }

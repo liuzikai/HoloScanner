@@ -389,11 +389,14 @@ public class ResearchModeVideoStream : MonoBehaviour
     {
 #if ENABLE_WINMD_SUPPORT
         var depthMap = researchMode.GetDepthMapBuffer();
-        var AbImage = researchMode.GetShortAbImageBuffer();
+        // var AbImage = researchMode.GetShortAbImageBuffer();
+        var rigToWorld = researchMode.GetRigToWorldBuffer();
 #if WINDOWS_UWP
         if (tcpClient != null)
         {
-            tcpClient.SendUINT16Async(depthMap, AbImage);
+            // tcpClient.SendUINT16Async(depthMap, AbImage);
+            tcpClient.SendUINT16Async(depthMap);
+            tcpClient.SendFloatAsync(rigToWorld);
         }
 #endif
 #endif

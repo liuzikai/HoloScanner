@@ -53,7 +53,10 @@ def tcp_server():
             
             assert len(data) >= 5
             header = data[0:1].decode('utf-8')
-            data_length = struct.unpack(">i", data[1:5])[0] * 2  # data length in UINT16
+            if header in ['s', 'd']:
+                data_length = struct.unpack(">i", data[1:5])[0] * 2  # data length in UINT16
+            elif header == 'r':
+                data_length = struct.unpack(">i", data[1:5])[0] * 4  # data length in float
             print(f"[{header}] {data_length}")
             
             # Receive at least the whole package
@@ -79,7 +82,20 @@ def tcp_server():
             cv2.imwrite(save_folder + timestamp+'_depth.tiff', depth_img_np)
             cv2.imwrite(save_folder + timestamp+'_abImage.tiff', ab_img_np)
             print('Image with ts ' + timestamp + ' is saved')
-        if header == 'f':
+        elif header == 'd':
+            # Show depth sensor image
+            N = struct.unpack(">i", data[1:5])[0] * 2  # length in UINT16 to size in bytes
+            depth_img_np = np.frombuffer(data[5:5+N], np.uint16).reshape((512,512))
+            depth_img_np = depth_img_np.astype(float) / 1000
+            depth_img_np = (1.0 - np.clip(depth_img_np, 0.2, 1.0)) * 255
+            depth_img_np = depth_img_np.astype(np.uint8)
+            cv2.imshow('AHaT', depth_img_np)
+            cv2.waitKey(1)
+        elif header == 'r':
+            N = struct.unpack(">i", data[1:5])[0] * 4  # length in float to size in bytes
+            rig2world = np.frombuffer(data[5:5+N], np.float32).reshape(4, 4)
+            print(rig2world)
+        elif header == 'f':
             # save spatial camera images
             data_length = struct.unpack(">i", data[1:5])[0]
             ts_left, ts_right = struct.unpack(">qq", data[5:21])
@@ -90,7 +106,7 @@ def tcp_server():
             cv2.imwrite(save_folder + str(ts_left)+'_LF.tiff', LF_img_np)
             cv2.imwrite(save_folder + str(ts_right)+'_RF.tiff', RF_img_np)
             print('Image with ts %d and %d is saved' % (ts_left, ts_right))
-        if header == 'p':
+        elif header == 'p':
             # save point cloud
             N_pointcloud = struct.unpack(">i", data[1:5])[0]
             print("Length of point cloud:" + str(N_pointcloud))

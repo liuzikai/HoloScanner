@@ -8,63 +8,18 @@
     <Filter Include="Generated Files">
       <UniqueIdentifier>{926ab91d-31b4-48c3-b9a4-e681349f27f0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Cannon">
-      <UniqueIdentifier>{ff99d34f-95b0-43cb-9fcc-98ad018f9e38}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
     <ClCompile Include="TimeConverter.cpp" />
     <ClCompile Include="HL2Cannon.cpp" />
-    <ClCompile Include="Cannon\MixedReality.cpp">
-      <Filter>Cannon</Filter>
-    </ClCompile>
-    <ClCompile Include="Cannon\TrackedHands.cpp">
-      <Filter>Cannon</Filter>
-    </ClCompile>
-    <ClCompile Include="Cannon\RecordedValue.cpp">
-      <Filter>Cannon</Filter>
-    </ClCompile>
-    <ClCompile Include="Cannon\AnimatedVector.cpp">
-      <Filter>Cannon</Filter>
-    </ClCompile>
-    <ClCompile Include="Cannon\DrawCall.cpp">
-      <Filter>Cannon</Filter>
-    </ClCompile>
-    <ClCompile Include="Cannon\FloatingSlate.cpp">
-      <Filter>Cannon</Filter>
-    </ClCompile>
-    <ClCompile Include="Cannon\FloatingText.cpp">
-      <Filter>Cannon</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="ResearchModeApi.h" />
     <ClInclude Include="TimeConverter.h" />
     <ClInclude Include="HL2Cannon.h" />
-    <ClInclude Include="Cannon\MixedReality.h">
-      <Filter>Cannon</Filter>
-    </ClInclude>
-    <ClInclude Include="Cannon\TrackedHands.h">
-      <Filter>Cannon</Filter>
-    </ClInclude>
-    <ClInclude Include="Cannon\RecordedValue.h">
-      <Filter>Cannon</Filter>
-    </ClInclude>
-    <ClInclude Include="Cannon\AnimatedVector.h">
-      <Filter>Cannon</Filter>
-    </ClInclude>
-    <ClInclude Include="Cannon\DrawCall.h">
-      <Filter>Cannon</Filter>
-    </ClInclude>
-    <ClInclude Include="Cannon\FloatingSlate.h">
-      <Filter>Cannon</Filter>
-    </ClInclude>
-    <ClInclude Include="Cannon\FloatingText.h">
-      <Filter>Cannon</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="HL2UnityPlugin.def" />
@@ -78,6 +33,6 @@
   </ItemGroup>
   <ItemGroup>
     <Midl Include="HL2ResearchMode.idl" />
-    <Midl Include="HL2Cannon.idl" />
+    <Midl Include="HL2Interactions.idl" />
   </ItemGroup>
 </Project>

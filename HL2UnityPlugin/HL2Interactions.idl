@@ -1,0 +1,62 @@
+namespace HL2UnityPlugin
+{
+    enum HandJointIndex
+    {
+        Palm,
+        Wrist,
+        ThumbMetacarpal,
+        ThumbProximal,
+        ThumbDistal,
+        ThumbTip,
+        IndexMetacarpal,
+        IndexProximal,
+        IndexIntermediate,
+        IndexDistal,
+        IndexTip,
+        MiddleMetacarpal,
+        MiddleProximal,
+        MiddleIntermediate,
+        MiddleDistal,
+        MiddleTip,
+        RingMetacarpal,
+        RingProximal,
+        RingIntermediate,
+        RingDistal,
+        RingTip,
+        PinkyMetacarpal,
+        PinkyProximal,
+        PinkyIntermediate,
+        PinkyDistal,
+        PinkyTip,
+        Count,
+    };
+
+    enum HandIndex
+    {
+        Left,
+        Right,
+        Count,
+    };
+
+    runtimeclass HL2Interactions
+    {
+        HL2Interactions();
+
+        void SetReferenceCoordinateSystem(Windows.Perception.Spatial.SpatialCoordinateSystem refCoord);
+
+        void Update(Windows.Perception.PerceptionTimestamp timestamp);
+
+        // Head tracking (class TrackedHands)
+        Single[] GetHeadTransform();    // float4x4
+
+        // Hand tracking (class TrackedHands)
+        Boolean IsHandTracked(HandIndex handIndex);
+        Single[] GetOrientedJoint(HandIndex handIndex);  // array of float4x4s indexed by HandJointIndex
+        
+        // Eye tracking (class MixedReality)
+        void EnableEyeTracking();
+        Boolean IsEyeTrackingActive();
+        Single[] GetEyeGazeOrigin();    // float4
+	    Single[] GetEyeGazeDirection(); // float4
+    }
+}
