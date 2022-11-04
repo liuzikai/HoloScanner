@@ -1439,7 +1439,8 @@ namespace winrt::HL2UnityPlugin::implementation
         return static_cast<long long>(val);
     }
 
-    XMMATRIX HL2ResearchMode::SpatialLocationToDxMatrix(SpatialLocation location) {
+    XMMATRIX HL2ResearchMode::SpatialLocationToDxMatrix(SpatialLocation location) 
+    {
         auto rot = location.Orientation();
         auto quatInDx = XMFLOAT4(rot.x, rot.y, rot.z, rot.w);
         auto rotMat = XMMatrixRotationQuaternion(XMLoadFloat4(&quatInDx));

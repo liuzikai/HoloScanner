@@ -1,21 +1,70 @@
 #pragma once
 #include "HL2Interactions.g.h"
+#include <thread>
+#include <DirectXMath.h>
+#include <winrt/Windows.Perception.Spatial.h>
 
 namespace winrt::HL2UnityPlugin::implementation
 {
+    struct HandJoint
+    {
+        DirectX::XMVECTOR position;
+        DirectX::XMVECTOR orientation;
+        DirectX::XMMATRIX transformation;  // TrackedHands::GetOrientedJoint()
+        float radius;
+        bool tracked;
+    };
+
+    struct Hand
+    {
+        DirectX::XMVECTOR position;
+        DirectX::XMVECTOR orientation;	// Quaternion
+
+        std::vector<HandJoint> handJoints;
+    };
+
     struct HL2Interactions : HL2InteractionsT<HL2Interactions>
     {
-        HL2Interactions() = default;
+        HL2Interactions();
 
-        void SetReferenceCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& refCoord);
-        void Update(Windows::Perception::PerceptionTimestamp const& timestamp);
-        com_array<float> GetHeadTransform();
-        bool IsHandTracked(HL2UnityPlugin::HandIndex const& handIndex);
-        com_array<float> GetOrientedJoint(HL2UnityPlugin::HandIndex const& handIndex);
+        void SetReferenceCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem refCoord);
+
+        void Update(Windows::Perception::PerceptionTimestamp timestamp);
+
+        Windows::Foundation::Numerics::float4x4 GetHeadTransform();
+
+        bool IsHandTracked(HL2UnityPlugin::HandIndex handIndex);
+        bool IsJointTracked(HL2UnityPlugin::HandIndex handIndex, HL2UnityPlugin::HandJointIndex jointIndex);
+        Windows::Foundation::Numerics::float4x4 GetOrientedJoint(HL2UnityPlugin::HandIndex handIndex, HL2UnityPlugin::HandJointIndex jointIndex);
+
         void EnableEyeTracking();
+        bool IsEyeTrackingEnabled();
         bool IsEyeTrackingActive();
-        com_array<float> GetEyeGazeOrigin();
-        com_array<float> GetEyeGazeDirection();
+        Windows::Foundation::Numerics::float4 GetEyeGazeOrigin();
+        Windows::Foundation::Numerics::float4 GetEyeGazeDirection();
+
+    private:
+
+        DirectX::XMVECTOR m_headPosition;
+        DirectX::XMVECTOR m_headForwardDirection;
+        DirectX::XMVECTOR m_headUpDirection;
+        DirectX::XMVECTOR m_headTransform;
+
+        bool m_isArticulatedHandTrackingAPIAvailable;	// True if articulated hand tracking API is available
+        bool m_handTracked[HL2UnityPlugin::HandIndex::Count];
+        Hand m_hand[HL2UnityPlugin::HandIndex::Count];
+
+        bool m_isEyeTrackingAvailable;	// True if system supports eye tracking APIs and an eye tracking system is available
+        bool m_isEyeTrackingRequested;	// True if app requested to enable eye tracking
+        bool m_isEyeTrackingEnabled;	// True if eye tracking was successfully enabled
+        bool m_isEyeTrackingActive;		// True if eye tracking is actively tracking (calibration available, etc)
+        DirectX::XMVECTOR m_eyeGazeOrigin;
+        DirectX::XMVECTOR m_eyeGazeDirection;
+
+        Windows::Perception::Spatial::SpatialCoordinateSystem m_refFrame = nullptr;
+
+        static Windows::Foundation::Numerics::float4 HL2Interactions::XMVECTORToFloat4(const XMVECTOR &vector);
+        static Windows::Foundation::Numerics::float4 HL2Interactions::XMMATRIXToFloat4x4(const XMMATRIX &matrix);
     };
 }
 namespace winrt::HL2UnityPlugin::factory_implementation

@@ -13,8 +13,8 @@
 #include <cmath>
 #include <DirectXMath.h>
 #include <vector>
-#include<winrt/Windows.Perception.Spatial.h>
-#include<winrt/Windows.Perception.Spatial.Preview.h>
+#include <winrt/Windows.Perception.Spatial.h>
+#include <winrt/Windows.Perception.Spatial.Preview.h>
 
 namespace winrt::HL2UnityPlugin::implementation
 {

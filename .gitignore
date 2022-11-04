@@ -358,3 +358,8 @@ data/
 
 .DS_Store
 ._.DS_Store
+
+.idea/
+.fleet/
+HackedIncludes/
+CMakeLists.txt

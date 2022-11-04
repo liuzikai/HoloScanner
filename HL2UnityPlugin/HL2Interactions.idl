@@ -46,17 +46,19 @@ namespace HL2UnityPlugin
 
         void Update(Windows.Perception.PerceptionTimestamp timestamp);
 
-        // Head tracking (class TrackedHands)
-        Single[] GetHeadTransform();    // float4x4
+        // Head tracking
+        Windows.Foundation.Numerics.Matrix4x4 GetHeadTransform();
 
-        // Hand tracking (class TrackedHands)
+        // Hand tracking
         Boolean IsHandTracked(HandIndex handIndex);
-        Single[] GetOrientedJoint(HandIndex handIndex);  // array of float4x4s indexed by HandJointIndex
+        Boolean IsJointTracked(HandIndex handIndex, HandJointIndex jointIndex);
+        Windows.Foundation.Numerics.Matrix4x4 GetOrientedJoint(HandIndex handIndex, HandJointIndex jointIndex);
         
-        // Eye tracking (class MixedReality)
+        // Eye tracking
         void EnableEyeTracking();
+        Boolean IsEyeTrackingEnabled();
         Boolean IsEyeTrackingActive();
-        Single[] GetEyeGazeOrigin();    // float4
-	    Single[] GetEyeGazeDirection(); // float4
+        Windows.Foundation.Numerics.Vector4 GetEyeGazeOrigin();
+	    Windows.Foundation.Numerics.Vector4 GetEyeGazeDirection();
     }
 }
