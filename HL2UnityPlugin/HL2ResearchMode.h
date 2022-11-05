@@ -84,9 +84,11 @@ namespace winrt::HL2UnityPlugin::implementation
         com_array<float> GetLongThrowPointCloudBuffer();
         com_array<float> GetCenterPoint();
 
+        Windows::Foundation::Numerics::float4x4 GetRigToWorld();
+
         Windows::Perception::PerceptionTimestamp GetDepthUpdateTimestamp();
-        com_array<float> GetRigToWorldBuffer();
-        com_array<float> GetDepthExtrinsics();
+
+        Windows::Foundation::Numerics::float4x4 GetDepthExtrinsics();
         com_array<float> GetDepthLUT();
 
         std::mutex mu;
@@ -106,7 +108,7 @@ namespace winrt::HL2UnityPlugin::implementation
         UINT8* m_longDepthMapTexture = nullptr;
 
         ResearchModeSensorTimestamp m_depthTimestamp;
-        float* m_rigToWorld = nullptr;
+        DirectX::XMMATRIX m_rigToWorld;
         float* m_depthLUT = nullptr;
 
 		UINT8* m_LFImage = nullptr;

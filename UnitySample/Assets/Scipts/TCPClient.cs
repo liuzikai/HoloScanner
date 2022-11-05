@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 //using System.Runtime.Serialization.Formatters.Binary;
 #if WINDOWS_UWP
@@ -19,51 +21,57 @@ public class TCPClient : MonoBehaviour
         if (!focus)
         {
 #if WINDOWS_UWP
-            StopCoonection();
+            StopConnection();
 #endif
         }
     }
     #endregion // Unity Functions
 
     [SerializeField]
-    string hostIPAddress, port;
+    List<string> hostIPAddresses = new List<string>();
+    
+    [SerializeField]
+    string port;
 
     public Renderer ConnectionStatusLED;
-    private bool connected = false;
-    public bool Connected
-    {
-        get { return connected; }
-    }
+    public bool Connected { get; private set; } = false;
 
     public ResearchModeVideoStream videoStream;
+
+    public int PendingMessageCount { get; private set; } = 0;
+    public int MaxPendingMessageCount = 20;
 
 #if WINDOWS_UWP
     StreamSocket socket = null;
     public DataWriter dw;
     public DataReader dr;
-    private async void StartCoonection()
+    private async void StartConnection()
     {
-        if (socket != null) socket.Dispose();
+        if(socket != null) socket.Dispose();
+        socket = new StreamSocket();
 
-        try
+        foreach(var hostIPAddress in hostIPAddresses)
         {
-            socket = new StreamSocket();
-            var hostName = new Windows.Networking.HostName(hostIPAddress);
-            await socket.ConnectAsync(hostName, port);
-            dw = new DataWriter(socket.OutputStream);
-            dr = new DataReader(socket.InputStream);
-            dr.InputStreamOptions = InputStreamOptions.Partial;
-            connected = true;
-            ConnectionStatusLED.material.color = Color.green;
-        }
-        catch (Exception ex)
-        {
-            SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
-            Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
+            try
+            {
+                var hostName = new Windows.Networking.HostName(hostIPAddress);
+                await socket.ConnectAsync(hostName, port);
+                dw = new DataWriter(socket.OutputStream);
+                dr = new DataReader(socket.InputStream);
+                dr.InputStreamOptions = InputStreamOptions.Partial;
+                Connected = true;
+                ConnectionStatusLED.material.color = Color.green;
+                break;
+            }
+            catch (Exception ex)
+            {
+                SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
+                Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
+            }
         }
     }
 
-    private void StopCoonection()
+    private void StopConnection()
     {
         if (videoStream.AHATRecording) videoStream.ToggleAHATRecordingEvent();
 
@@ -76,15 +84,17 @@ public class TCPClient : MonoBehaviour
         dr = null;
 
         socket?.Dispose();
-        connected = false;
+        Connected = false;
         ConnectionStatusLED.material.color = Color.red;
+
+        PendingMessageCount = 0;
     }
 
-    bool lastMessageSent = true;
     public async void SendUINT16Async(string header, ushort[] data)
     {
-        if (!lastMessageSent) return;
-        lastMessageSent = false;
+        if (PendingMessageCount >= MaxPendingMessageCount) return;
+
+        PendingMessageCount++;
         try
         {
             // Write header
@@ -105,41 +115,14 @@ public class TCPClient : MonoBehaviour
             SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
             Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
         }
-        lastMessageSent = true;
-    }
-
-    public async void SendUINT16Async(string header, ushort[] data1, ushort[] data2)
-    {
-        // if (!lastMessageSent) return;
-        // lastMessageSent = false;
-        try
-        {
-            // Write header
-            dw.WriteString(header);
-
-            // Write length in bytes
-            dw.WriteInt32((data1.Length + data2.Length) * sizeof(ushort));
-
-            // Write actual data
-            dw.WriteBytes(UINT16ToBytes(data1));
-            dw.WriteBytes(UINT16ToBytes(data2));
-
-            // Send out
-            await dw.StoreAsync();
-            await dw.FlushAsync();
-        }
-        catch (Exception ex)
-        {
-            SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
-            Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
-        }
-        lastMessageSent = true;
+        PendingMessageCount--;
     }
 
     public async void SendFloatAsync(string header, float[] data)
     {
-        // if (!lastMessageSent) return;
-        // lastMessageSent = false;
+        if (PendingMessageCount >= MaxPendingMessageCount) return;
+
+        PendingMessageCount++;
         try
         {
             // Write header
@@ -160,14 +143,15 @@ public class TCPClient : MonoBehaviour
             SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
             Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
         }
-        lastMessageSent = true;
+        PendingMessageCount--;
     }
 
     // TODO: [Zikai] the convention is inconsistent with above, but we are not using them for now
     public async void SendSpatialImageAsync(byte[] LFImage, byte[] RFImage, long ts_left, long ts_right)
     {
-        if (!lastMessageSent) return;
-        lastMessageSent = false;
+        if (PendingMessageCount >= MaxPendingMessageCount) return;
+
+        PendingMessageCount++;
         try
         {
             // Write header
@@ -191,14 +175,15 @@ public class TCPClient : MonoBehaviour
             SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
             Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
         }
-        lastMessageSent = true;
+        PendingMessageCount--;
     }
 
 
     public async void SendSpatialImageAsync(byte[] LRFImage, long ts_left, long ts_right)
     {
-        if (!lastMessageSent) return;
-        lastMessageSent = false;
+        if (PendingMessageCount >= MaxPendingMessageCount) return;
+
+        PendingMessageCount++;
         try
         {
             // Write header
@@ -221,7 +206,7 @@ public class TCPClient : MonoBehaviour
             SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
             Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
         }
-        lastMessageSent = true;
+        PendingMessageCount--;
     }
 
 #endif
@@ -246,8 +231,8 @@ public class TCPClient : MonoBehaviour
     public void ConnectToServerEvent()
     {
 #if WINDOWS_UWP
-        if (!connected) StartCoonection();
-        else StopCoonection();
+        if (!Connected) StartConnection();
+        else StopConnection();
 #endif
     }
     #endregion

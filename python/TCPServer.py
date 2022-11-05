@@ -7,6 +7,7 @@ import cv2
 import time
 import open3d as o3d
 import pickle as pkl
+from collections import defaultdict
 
 def tcp_server():
     serverHost = '' # localhost
@@ -42,59 +43,80 @@ def tcp_server():
     print('Connected with ' + addr[0] + ':' + str(addr[1]))
 
     data = bytes()
+    frame_counts = defaultdict(int)
+    last_stat_time = time.time()
     while True:
-        # Receiving from client
-        try:
-            # Receive at least the header and the length
-            while len(data) < 5:
-                buf = conn.recv(512*512*4+100)
-                if len(buf) != 0:
-                    data += buf
-            
-            assert len(data) >= 5
-            header = data[0:1].decode('utf-8')
-            if header in ['s', 'd']:
-                data_length = struct.unpack(">i", data[1:5])[0] * 2  # data length in UINT16
-            elif header == 'r':
-                data_length = struct.unpack(">i", data[1:5])[0] * 4  # data length in float
-            print(f"[{header}] {data_length}")
-            
-            # Receive at least the whole package
-            while len(data) < 5 + data_length:
-                buf = conn.recv(512*512*4+100)
-                if len(buf) != 0:
-                    data += buf
+        data_length = 0  # in bytes
 
-        except Exception as e:
-            print(e)
-            break
-
-        # Continue to decode the buffer
+        # Receive at least the header and the length
+        while len(data) < 5:
+            buf = conn.recv(5)
+            if len(buf) != 0:
+                data += buf
         
-        # print(len(data))
+        timestamp = str(round(time.time_ns() * 100))  # hundred of nanoseconds
 
-        if header == 's':
-            # save depth sensor images
-            N = struct.unpack(">i", data[1:5])[0]  # data_length * 2 /2
-            depth_img_np = np.frombuffer(data[5:5+N], np.uint16).reshape((512,512))
-            ab_img_np = np.frombuffer(data[5+N:5+2*N], np.uint16).reshape((512,512))
-            timestamp = str(int(time.time()))
-            cv2.imwrite(save_folder + timestamp+'_depth.tiff', depth_img_np)
-            cv2.imwrite(save_folder + timestamp+'_abImage.tiff', ab_img_np)
-            print('Image with ts ' + timestamp + ' is saved')
-        elif header == 'd':
+        assert len(data) >= 5
+        header = data[0:1].decode('utf-8')
+        data_length = struct.unpack(">i", data[1:5])[0]  # data length
+        # print(f"[{header}] {data_length}")
+
+        frame_counts[header] += 1
+        current_time = time.time()
+        if current_time - last_stat_time > 1:
+            print("[Stats]", "    ".join([f"{key}: {round(value / (current_time - last_stat_time))} fps" for key, value in frame_counts.items()]))
+            frame_counts.clear()
+            last_stat_time = current_time
+        
+        # Receive at least the whole package
+        while len(data) < 5 + data_length:
+            buf = conn.recv(data_length)
+            if len(buf) != 0:
+                data += buf
+
+
+        # Decode the buffer
+        if header == 'd':
             # Show depth sensor image
-            N = struct.unpack(">i", data[1:5])[0] * 2  # length in UINT16 to size in bytes
-            depth_img_np = np.frombuffer(data[5:5+N], np.uint16).reshape((512,512))
+            depth_img_np = np.frombuffer(data[5:5 + data_length], np.uint16).reshape((512,512))
             depth_img_np = depth_img_np.astype(float) / 1000
             depth_img_np = (1.0 - np.clip(depth_img_np, 0.2, 1.0)) * 255
             depth_img_np = depth_img_np.astype(np.uint8)
             cv2.imshow('AHaT', depth_img_np)
             cv2.waitKey(1)
         elif header == 'r':
-            N = struct.unpack(">i", data[1:5])[0] * 4  # length in float to size in bytes
-            rig2world = np.frombuffer(data[5:5+N], np.float32).reshape(4, 4)
-            print(rig2world)
+            rig2world = np.frombuffer(data[5:5 + data_length], np.float32).reshape(4, 4)
+            # print(rig2world)
+        elif header == 'e':
+            ahat_extrinsics = np.frombuffer(data[5:5 + data_length], np.float32).reshape(4, 4)
+            print(f"AHAT extrinsics received:")
+            print(ahat_extrinsics)
+        elif header == 'l':
+            lut = np.frombuffer(data[5:5 + data_length], np.float32)
+            print(f"LUT received, length = {len(lut)}, saving to lut.bin:")
+            open(os.path.join(save_folder, "lut.bin"), "wb").write(data[5:5 + data_length])
+            print(lut)
+        elif header == 'i':
+            f = np.frombuffer(data[5:5 + data_length], np.float32)
+            # print(f)
+            
+            # head_transform = data[:16].reshape(4, 4)
+            # data = data[16:]
+            # print(head_transform)
+
+            left_hand_present = (f[16] == 1.0)
+            right_hand_present = (f[16 + 1 + 26 * 16] == 1.0)
+            # print(f"Left hand present: {int(left_hand_present)}   Right hand present: {int(right_hand_present)}")
+
+            
+
+            # first_joint = f[:16].reshape(4, 4)
+            # data = data[16:]
+            # print(first_joint)
+
+            
+
+        # TODO: [Zikai] "f" and "p" has not been adapted, and the length is not in bytes...
         elif header == 'f':
             # save spatial camera images
             data_length = struct.unpack(">i", data[1:5])[0]
@@ -103,8 +125,8 @@ def tcp_server():
             N = int(data_length/2)
             LF_img_np = np.frombuffer(data[21:21+N], np.uint8).reshape((480,640))
             RF_img_np = np.frombuffer(data[21+N:21+2*N], np.uint8).reshape((480,640))
-            cv2.imwrite(save_folder + str(ts_left)+'_LF.tiff', LF_img_np)
-            cv2.imwrite(save_folder + str(ts_right)+'_RF.tiff', RF_img_np)
+            cv2.imwrite(save_folder + "/" + str(ts_left)+'_LF.tiff', LF_img_np)
+            cv2.imwrite(save_folder + "/" + str(ts_right)+'_RF.tiff', RF_img_np)
             print('Image with ts %d and %d is saved' % (ts_left, ts_right))
         elif header == 'p':
             # save point cloud

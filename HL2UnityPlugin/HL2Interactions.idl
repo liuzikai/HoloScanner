@@ -40,7 +40,7 @@ namespace HL2UnityPlugin
 
     runtimeclass HL2Interactions
     {
-        HL2Interactions();
+        HL2Interactions();  // must be called in UnityEngine.WSA.Application.InvokeOnUIThread
 
         void SetReferenceCoordinateSystem(Windows.Perception.Spatial.SpatialCoordinateSystem refCoord);
 

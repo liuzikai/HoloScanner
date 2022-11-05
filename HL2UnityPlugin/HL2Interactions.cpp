@@ -9,6 +9,7 @@ namespace winrt::HL2UnityPlugin::implementation
 
     HL2Interactions::HL2Interactions() 
     {
+        // This function only works in the UI thread (UnityEngine.WSA.Application.InvokeOnUIThread)
         m_spatialInteractionManager = winrt::Windows::UI::Input::Spatial::SpatialInteractionManager::GetForCurrentView();
 
         m_headPosition = XMVectorZero();
@@ -42,17 +43,41 @@ namespace winrt::HL2UnityPlugin::implementation
 
     void HL2Interactions::Update(Windows::Perception::PerceptionTimestamp timestamp)
     {
+        // Request eye tracking access if needed
+        if (m_isEyeTrackingAvailable && m_isEyeTrackingRequested && !m_isEyeTrackingEnabled)
+        {
+            m_isEyeTrackingRequested = false;
+
+            std::thread requestAccessThread([this]()
+                {
+                    auto status = winrt::Windows::Perception::People::EyesPose::RequestAccessAsync().get();
+
+                    if (status == winrt::Windows::UI::Input::GazeInputAccessStatus::Allowed)
+                        m_isEyeTrackingEnabled = true;
+                    else
+                        m_isEyeTrackingEnabled = false;
+                });
+
+            requestAccessThread.detach();
+        }
+
         // Update head and eye
         winrt::Windows::UI::Input::Spatial::SpatialPointerPose pointerPose = winrt::Windows::UI::Input::Spatial::SpatialPointerPose::TryGetAtTimestamp(m_refFrame, timestamp);
         if (pointerPose)
         {
-            m_headPosition = XMVectorSetW(XMLoadFloat3(&pointerPose.Head().Position()), 1.0f);
-            m_headForwardDirection = XMLoadFloat3(&pointerPose.Head().ForwardDirection());
-            m_headUpDirection = XMLoadFloat3(&pointerPose.Head().UpDirection());
+            auto position = pointerPose.Head().Position();
+            m_headPosition = XMVectorSetW(XMLoadFloat3(&position), 1.0f);
+
+            auto forwardDirection = pointerPose.Head().ForwardDirection();
+            m_headForwardDirection = XMLoadFloat3(&forwardDirection);
+
+            auto upDirection = pointerPose.Head().UpDirection();
+            m_headUpDirection = XMLoadFloat3(&upDirection);
+            
             XMMATRIX worldTransform = XMMatrixLookToRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), m_headForwardDirection, m_headUpDirection);
 	        m_headTransform = XMMatrixMultiply(XMMatrixTranspose(worldTransform), XMMatrixTranslationFromVector(m_headPosition));
 
-            // if (m_isEyeTrackingEnabled)
+            if (m_isEyeTrackingEnabled)
             {
                 if (pointerPose.Eyes() && pointerPose.Eyes().IsCalibrationValid())
                 {
@@ -72,26 +97,10 @@ namespace winrt::HL2UnityPlugin::implementation
             }
         }
 
-        // Request eye tracking access if needed
-        /* if (m_isEyeTrackingAvailable && m_isEyeTrackingRequested && !m_isEyeTrackingEnabled)
-        {
-            m_isEyeTrackingRequested = false;
-
-            std::thread requestAccessThread([this]()
-                {
-                    auto status = winrt::Windows::Perception::People::EyesPose::RequestAccessAsync().get();
-
-                    if (status == winrt::Windows::UI::Input::GazeInputAccessStatus::Allowed)
-                        m_isEyeTrackingEnabled = true;
-                    else
-                        m_isEyeTrackingEnabled = false;
-                });
-
-            requestAccessThread.detach();
-        } */
+        
 
         // Update hands
-        /*memset(m_handTracked, 0, sizeof(m_handTracked));
+        memset(m_handTracked, 0, sizeof(m_handTracked));
         auto sourceStates = m_spatialInteractionManager.GetDetectedSourcesAtTimestamp(timestamp);
         for (auto currentState : sourceStates)
         {
@@ -115,7 +124,7 @@ namespace winrt::HL2UnityPlugin::implementation
             m_handTracked[handIndex] = true;
 
             // Get joint data
-            winrt::Windows::Perception::People::HandPose handPose{nullptr};
+            winrt::Windows::Perception::People::HandPose handPose = nullptr;
             if (m_isArticulatedHandTrackingAPIAvailable)
             {
                 handPose = currentState.TryGetHandPose();
@@ -158,12 +167,19 @@ namespace winrt::HL2UnityPlugin::implementation
             if (location)
             {
                 auto position = location.Position();
-                if (position) hand.position = XMLoadFloat3(&position.Value());
+                if (position) {
+                    auto value = position.Value();
+                    hand.position = XMLoadFloat3(&value);
+                }
                 
                 auto orientation = location.Orientation();
-                if (orientation) hand.orientation = XMLoadFloat4((XMFLOAT4*) &orientation.Value());
+                if (orientation)
+                {
+                    auto value = orientation.Value();
+                    hand.orientation = XMLoadFloat4((XMFLOAT4*)&value);
+                }
             }
-        }*/
+        }
     }
 
     Windows::Foundation::Numerics::float4x4 HL2Interactions::GetHeadTransform()
@@ -173,28 +189,39 @@ namespace winrt::HL2UnityPlugin::implementation
 
     bool HL2Interactions::IsHandTracked(HL2UnityPlugin::HandIndex handIndex)
     {
-        return m_handTracked[(size_t) handIndex];
+        size_t handID = (size_t) handIndex;
+        if (handID >= (size_t) HL2UnityPlugin::HandIndex::Count)
+        {
+            return false;
+        } else {
+            return m_handTracked[handID];
+        }
     }
 
     bool HL2Interactions::IsJointTracked(HL2UnityPlugin::HandIndex handIndex, HL2UnityPlugin::HandJointIndex jointIndex)
     {
-        if (!m_handTracked[(size_t) handIndex]) return false;
-
-        const auto &hand = m_hand[(size_t) handIndex];
-        if (hand.handJoints.size() <= (size_t) jointIndex) {
+        size_t handID = (size_t) handIndex, jointID = (size_t) jointIndex;
+        if (handID >= (size_t) HL2UnityPlugin::HandIndex::Count ||
+            !m_handTracked[handID] ||
+            jointID >= m_hand[handID].handJoints.size()) 
+        {
             return false;
         } else {
-            return hand.handJoints[(size_t) jointIndex].tracked;
+            return m_hand[handID].handJoints[jointID].tracked;
         }
     }
 
     Windows::Foundation::Numerics::float4x4 HL2Interactions::GetOrientedJoint(HL2UnityPlugin::HandIndex handIndex, HL2UnityPlugin::HandJointIndex jointIndex)
     {
-        const auto &hand = m_hand[(size_t) handIndex];
-        if (hand.handJoints.size() <= (size_t) jointIndex) {
+        size_t handID = (size_t) handIndex, jointID = (size_t) jointIndex;
+        if (handID >= (size_t) HL2UnityPlugin::HandIndex::Count ||
+            /* ignore m_handTracked[handID] and return the last value */
+            jointID >= m_hand[handID].handJoints.size()) 
+            /* ignore handJoints[jointID].tracked and return the estimated data */
+        {
             return XMMATRIXToFloat4x4(XMMatrixIdentity());
         } else {
-            return XMMATRIXToFloat4x4(hand.handJoints[(size_t) jointIndex].transformation);
+            return XMMATRIXToFloat4x4(m_hand[handID].handJoints[jointID].transformation);
         }
     }
 

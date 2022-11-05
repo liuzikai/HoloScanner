@@ -377,15 +377,8 @@ namespace winrt::HL2UnityPlugin::implementation
                     // save timestamp
                     pHL2ResearchMode->m_depthTimestamp = timestamp;
 
-                    // save rig2world as matrix
-                    if (!pHL2ResearchMode->m_rigToWorld)
-                    {
-                        OutputDebugString(L"Create Space for short rigToWorld...\n");
-                        pHL2ResearchMode->m_rigToWorld = new float[16];
-                    }
-                    XMMATRIX rigToWorld = XMMatrixTranspose(transToWorldMatrix);
-                    // TODO: [Zikai] transpose is inverse? Here we just simulate what HoloLen2CV does
-                    memcpy(pHL2ResearchMode->m_rigToWorld, &rigToWorld, 16 * sizeof(float));
+                    // save rigToWorld
+                    pHL2ResearchMode->m_rigToWorld = transToWorldMatrix;
                 }
                 pHL2ResearchMode->m_shortAbImageTextureUpdated = true;
                 pHL2ResearchMode->m_depthMapTextureUpdated = true;
@@ -1154,12 +1147,6 @@ namespace winrt::HL2UnityPlugin::implementation
 		m_pSensorDeviceConsent->Release();
 		m_pSensorDeviceConsent = nullptr;
 
-        if (m_rigToWorld)
-        {
-            delete[] m_rigToWorld;
-            m_rigToWorld = nullptr;
-        }
-        
         if (m_depthLUT)
         {
             delete[] m_depthLUT;
@@ -1449,23 +1436,19 @@ namespace winrt::HL2UnityPlugin::implementation
         return rotMat * posMat;
     }
 
-    com_array<float> HL2ResearchMode::GetRigToWorldBuffer()
+    Windows::Foundation::Numerics::float4x4 HL2ResearchMode::GetRigToWorld()
     {
         std::lock_guard<std::mutex> l(mu);
-        if (!m_rigToWorld)
-        {
-            return com_array<float>();
-        }
-        return com_array<float>(std::move_iterator(m_rigToWorld), std::move_iterator(m_rigToWorld + 16));
-        // TODO: [Zikai] why std::move_iterator? on raw pointer?
+        Windows::Foundation::Numerics::float4x4 ret;
+        XMStoreFloat4x4(&ret, m_rigToWorld);
+        return ret;
     }
 
-    com_array<float> HL2ResearchMode::GetDepthExtrinsics()
+    Windows::Foundation::Numerics::float4x4 HL2ResearchMode::GetDepthExtrinsics()
     {
-        std::lock_guard<std::mutex> l(mu);
-        float *f = (float *) &m_depthCameraPoseInvMatrix;
-        // TODO: [Zikai] m_depthCameraPoseInvMatrix?
-        return com_array<float>(f, f + 16);
+        Windows::Foundation::Numerics::float4x4 ret;
+        XMStoreFloat4x4(&ret, XMLoadFloat4x4(&m_depthCameraPose));
+        return ret;
     }
 
     com_array<float> HL2ResearchMode::GetDepthLUT()

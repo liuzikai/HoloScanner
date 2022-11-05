@@ -70,6 +70,7 @@ public class ResearchModeVideoStream : MonoBehaviour
     public bool AHATRecording {
         get { return ahatRecording; }
     }
+    private bool ahatLUTSent = false;
 
     private void Awake()
     {
@@ -164,7 +165,10 @@ public class ResearchModeVideoStream : MonoBehaviour
 
         researchMode.StartSpatialCamerasFrontLoop();
 
-        interactions = new HL2Interactions();
+        UnityEngine.WSA.Application.InvokeOnUIThread(() =>
+        {
+            interactions = new HL2Interactions();  // must be invoked on the UI thread since it needs SpatialInteractionManager
+        }, true);
         interactions.SetReferenceCoordinateSystem(unityWorldOrigin);
         interactions.EnableEyeTracking();
 #endif
@@ -224,12 +228,24 @@ public class ResearchModeVideoStream : MonoBehaviour
             }
         }
 
-        if (ahatRecording && ahatUpdated) {
-            // TODO: [Zikai] we don't know if Update() introduces a significant delay...
-            // interactions.Update(GetCurrentTimestamp());
-            SaveAHATSensorDataEvent();
-            SaveInteractionDataEvent();
+        if (ahatRecording && ahatUpdated) 
+        {
+            if (!ahatLUTSent) 
+            {
+                if (SendAHATLUTData())
+                {
+                    ahatLUTSent = true;
+                    ahatRecordingLED.material.color = Color.green;
+                }
+            }
 
+            if (ahatLUTSent)
+            {
+                // Measurements shows that the following call only takes 1-2ms
+                interactions.Update(researchMode.GetDepthUpdateTimestamp());
+                SendAHATDepthData();
+                SendInteractionData();
+            }
         }
 
         // update long depth map texture
@@ -340,12 +356,18 @@ public class ResearchModeVideoStream : MonoBehaviour
                 {
                     pointCloudVector3[i] = new Vector3(pointCloud[3 * i], pointCloud[3 * i + 1], pointCloud[3 * i + 2]);
                 }
-                if (depthSensorMode == DepthSensorMode.ShortThrow) {
-                    text.text = "Short-Throw ";
-                } else if (depthSensorMode == DepthSensorMode.LongThrow) {
+                if (depthSensorMode == DepthSensorMode.ShortThrow) 
+                {
+                    text.text = "AHAT ";
+                } else if (depthSensorMode == DepthSensorMode.LongThrow) 
+                {
                     text.text = "Long-Throw ";
                 }
-                text.text += "Point Cloud Length: " + pointCloudVector3.Length.ToString();
+                text.text += "Point Cloud: " + pointCloudVector3.Length.ToString();
+                if (tcpClient != null)
+                {
+                    text.text += "\n"+ "TCP Pending: " + tcpClient.PendingMessageCount.ToString();
+                }
                 pointCloudRenderer.Render(pointCloudVector3, pointColor);
             }
         }
@@ -385,91 +407,20 @@ public class ResearchModeVideoStream : MonoBehaviour
         if (!ahatRecording) {
             if (tcpClient.Connected) {
                 ahatRecording = true;
-                ahatRecordingLED.material.color = Color.green;
+                ahatLUTSent = false;
+                ahatRecordingLED.material.color = Color.yellow;
+
+#if ENABLE_WINMD_SUPPORT
+                var data = new List<float>();
+                SerializeMatrix4x4Transposed(data, researchMode.GetDepthExtrinsics());
+                tcpClient.SendFloatAsync("e", data.ToArray());
+#endif
             }
             
         } else {
             ahatRecording = false;
             ahatRecordingLED.material.color = Color.red;
         }
-    }
-
-    public void SaveAHATSensorDataEvent()
-    {
-#if ENABLE_WINMD_SUPPORT
-        var depthMap = researchMode.GetDepthMapBuffer();
-        var rigToWorld = researchMode.GetRigToWorldBuffer();
-#if WINDOWS_UWP
-        if (tcpClient != null)
-        {
-            tcpClient.SendUINT16Async("d", depthMap);
-            // tcpClient.SendFloatAsync("r", rigToWorld);
-        }
-#endif
-#endif
-    }
-
-    static private void SerializeMatrix4x4(ref List<float> l, System.Numerics.Matrix4x4 matrix) 
-    {
-        l.Add(matrix.M11);
-        l.Add(matrix.M12);
-        l.Add(matrix.M13);
-        l.Add(matrix.M14);
-        l.Add(matrix.M21);
-        l.Add(matrix.M22);
-        l.Add(matrix.M23);
-        l.Add(matrix.M24);
-        l.Add(matrix.M31);
-        l.Add(matrix.M32);
-        l.Add(matrix.M33);
-        l.Add(matrix.M34);
-        l.Add(matrix.M41);
-        l.Add(matrix.M42);
-        l.Add(matrix.M43);
-        l.Add(matrix.M44);
-    }
-
-    static private void SerializeVector4(ref List<float> l, System.Numerics.Vector4 vector) 
-    {
-        l.Add(vector.X);
-        l.Add(vector.Y);
-        l.Add(vector.Z);
-        l.Add(vector.W);
-    }
-
-    public void SaveInteractionDataEvent()
-    {
-#if ENABLE_WINMD_SUPPORT
-        List<float> data = new List<float>();
-
-        interactions.GetHeadTransform();
-        // Head
-        // SerializeMatrix4x4(ref data, );
-
-        // Hands
-        /* for (int i = 0; i < (int) HandIndex.Count; i++)
-        {
-            var handIndex = (HandIndex) i;
-            data.Add(interactions.IsHandTracked(handIndex) ? 1.0f : 0.0f);
-            for (int j = 0; j < (int) HandJointIndex.Count; j++)
-            {
-                // Different with StreamRecorder: not-tracked hand is not zeroed
-                SerializeMatrix4x4(ref data, interactions.GetOrientedJoint(handIndex, (HandJointIndex) j));
-            }
-        } */
-
-        // Eye
-        /* data.Add(interactions.IsEyeTrackingActive() ? 1.0f : 0.0f);
-        SerializeVector4(ref data, interactions.GetEyeGazeOrigin());
-        SerializeVector4(ref data, interactions.GetEyeGazeDirection()); */
-
-#if WINDOWS_UWP
-        if (tcpClient != null)
-        {
-            tcpClient.SendFloatAsync("i", data.ToArray());
-        }
-#endif
-#endif
     }
 
     public void SaveSpatialImageEvent()
@@ -498,6 +449,104 @@ public class ResearchModeVideoStream : MonoBehaviour
     }
 
     #endregion
+
+    public bool SendAHATLUTData()
+    {
+#if ENABLE_WINMD_SUPPORT
+        var ahatLUT = researchMode.GetDepthLUT();
+        if (ahatLUT.Length == 0) return false;
+#if WINDOWS_UWP
+        if (tcpClient != null)
+        {
+            tcpClient.SendFloatAsync("l", ahatLUT);
+            return true;  // here we just assume the sent will succeed
+        }
+#endif
+#endif
+        return false;
+    }
+
+    public void SendAHATDepthData()
+    {
+#if ENABLE_WINMD_SUPPORT
+        var depthMap = researchMode.GetDepthMapBuffer();
+        var rigToWorld = researchMode.GetRigToWorld();
+#if WINDOWS_UWP
+        if (tcpClient != null)
+        {
+            tcpClient.SendUINT16Async("d", depthMap);
+
+            var data = new List<float>();
+            SerializeMatrix4x4Transposed(data, rigToWorld);
+            tcpClient.SendFloatAsync("r", data.ToArray());
+        }
+#endif
+#endif
+    }
+
+    public void SendInteractionData()
+    {
+#if ENABLE_WINMD_SUPPORT
+        List<float> data = new List<float>();
+
+        // Head
+        SerializeMatrix4x4Transposed(data, interactions.GetHeadTransform());
+
+        // Hands
+        for (int i = 0; i < (int) HandIndex.Count; i++)
+        {
+            var handIndex = (HandIndex) i;
+            data.Add(interactions.IsHandTracked(handIndex) ? 1.0f : 0.0f);
+            for (int j = 0; j < (int) HandJointIndex.Count; j++)
+            {
+                // Different with StreamRecorder: not-tracked hand is not zeroed
+                SerializeMatrix4x4Transposed(data, interactions.GetOrientedJoint(handIndex, (HandJointIndex) j));
+            }
+        }
+
+        // Eye
+        data.Add(interactions.IsEyeTrackingActive() ? 1.0f : 0.0f);
+        SerializeVector4(data, interactions.GetEyeGazeOrigin());
+        SerializeVector4(data, interactions.GetEyeGazeDirection());
+
+#if WINDOWS_UWP
+        if (tcpClient != null)
+        {
+            tcpClient.SendFloatAsync("i", data.ToArray());
+        }
+#endif
+#endif
+    }
+
+    static private void SerializeMatrix4x4Transposed(List<float> l, System.Numerics.Matrix4x4 matrix) 
+    {
+        // In column major order
+        l.Add(matrix.M11);
+        l.Add(matrix.M21);
+        l.Add(matrix.M31);
+        l.Add(matrix.M41);
+        l.Add(matrix.M12);
+        l.Add(matrix.M22);
+        l.Add(matrix.M32);
+        l.Add(matrix.M42);
+        l.Add(matrix.M13);
+        l.Add(matrix.M23);
+        l.Add(matrix.M33);
+        l.Add(matrix.M43);
+        l.Add(matrix.M14);
+        l.Add(matrix.M24);
+        l.Add(matrix.M34);
+        l.Add(matrix.M44);
+    }
+
+    static private void SerializeVector4(List<float> l, System.Numerics.Vector4 vector) 
+    {
+        l.Add(vector.X);
+        l.Add(vector.Y);
+        l.Add(vector.Z);
+        l.Add(vector.W);
+    }
+
     private void OnApplicationFocus(bool focus)
     {
         if (!focus) StopSensorsEvent();
