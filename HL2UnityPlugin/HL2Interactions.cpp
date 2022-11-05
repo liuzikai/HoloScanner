@@ -9,6 +9,8 @@ namespace winrt::HL2UnityPlugin::implementation
 
     HL2Interactions::HL2Interactions() 
     {
+        m_spatialInteractionManager = winrt::Windows::UI::Input::Spatial::SpatialInteractionManager::GetForCurrentView();
+
         m_headPosition = XMVectorZero();
         m_headForwardDirection = XMVectorSet(0.0f, 0.0f, -1.0f, 0.0f);
         m_headUpDirection = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -50,7 +52,7 @@ namespace winrt::HL2UnityPlugin::implementation
             XMMATRIX worldTransform = XMMatrixLookToRH(XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f), m_headForwardDirection, m_headUpDirection);
 	        m_headTransform = XMMatrixMultiply(XMMatrixTranspose(worldTransform), XMMatrixTranslationFromVector(m_headPosition));
 
-            if (m_isEyeTrackingEnabled)
+            // if (m_isEyeTrackingEnabled)
             {
                 if (pointerPose.Eyes() && pointerPose.Eyes().IsCalibrationValid())
                 {
@@ -71,7 +73,7 @@ namespace winrt::HL2UnityPlugin::implementation
         }
 
         // Request eye tracking access if needed
-        if (m_isEyeTrackingAvailable && m_isEyeTrackingRequested && !m_isEyeTrackingEnabled)
+        /* if (m_isEyeTrackingAvailable && m_isEyeTrackingRequested && !m_isEyeTrackingEnabled)
         {
             m_isEyeTrackingRequested = false;
 
@@ -86,24 +88,24 @@ namespace winrt::HL2UnityPlugin::implementation
                 });
 
             requestAccessThread.detach();
-        }
+        } */
 
         // Update hands
-        memset(m_handTracked, 0, sizeof(m_handTracked));
+        /*memset(m_handTracked, 0, sizeof(m_handTracked));
         auto sourceStates = m_spatialInteractionManager.GetDetectedSourcesAtTimestamp(timestamp);
         for (auto currentState : sourceStates)
         {
             if (currentState.Source().Kind() != winrt::Windows::UI::Input::Spatial::SpatialInteractionSourceKind::Hand) continue;
             
             // Check handedness
-            int handIndex;
+            size_t handIndex;
             switch (currentState.Source().Handedness())
             {
                 case winrt::Windows::UI::Input::Spatial::SpatialInteractionSourceHandedness::Left:
-                    handIndex = HL2UnityPlugin::HandIndex::Left;
+                    handIndex = (size_t) HL2UnityPlugin::HandIndex::Left;
                     break;
                 case winrt::Windows::UI::Input::Spatial::SpatialInteractionSourceHandedness::Right:
-                    handIndex = HL2UnityPlugin::HandIndex::Right;
+                    handIndex = (size_t)HL2UnityPlugin::HandIndex::Right;
                     break;
                 default:
                     continue;
@@ -113,7 +115,7 @@ namespace winrt::HL2UnityPlugin::implementation
             m_handTracked[handIndex] = true;
 
             // Get joint data
-            winrt::Windows::Perception::People::HandPose handPose{ nullptr };
+            winrt::Windows::Perception::People::HandPose handPose{nullptr};
             if (m_isArticulatedHandTrackingAPIAvailable)
             {
                 handPose = currentState.TryGetHandPose();
@@ -121,7 +123,7 @@ namespace winrt::HL2UnityPlugin::implementation
 
             if (handPose)
             {
-                static vector<winrt::Windows::Perception::People::HandJointKind> requestedJointIndices;
+                static std::vector<winrt::Windows::Perception::People::HandJointKind> requestedJointIndices;
                 if (requestedJointIndices.empty())
                 {
                     requestedJointIndices.resize((size_t) HL2UnityPlugin::HandJointIndex::Count);
@@ -131,7 +133,7 @@ namespace winrt::HL2UnityPlugin::implementation
                     }
                 }
 
-                static vector<winrt::Windows::Perception::People::JointPose> jointPoses(requestedJointIndices.size());
+                static std::vector<winrt::Windows::Perception::People::JointPose> jointPoses(requestedJointIndices.size());
 
                 if (handPose.TryGetJoints(m_refFrame, requestedJointIndices, jointPoses))
                 {
@@ -156,12 +158,12 @@ namespace winrt::HL2UnityPlugin::implementation
             if (location)
             {
                 auto position = location.Position();
-                if(position) hand.position = XMLoadFloat3(&position.Value());
+                if (position) hand.position = XMLoadFloat3(&position.Value());
                 
                 auto orientation = location.Orientation();
                 if (orientation) hand.orientation = XMLoadFloat4((XMFLOAT4*) &orientation.Value());
             }
-        }
+        }*/
     }
 
     Windows::Foundation::Numerics::float4x4 HL2Interactions::GetHeadTransform()
@@ -171,17 +173,29 @@ namespace winrt::HL2UnityPlugin::implementation
 
     bool HL2Interactions::IsHandTracked(HL2UnityPlugin::HandIndex handIndex)
     {
-        return m_handTracked[handIndex];
+        return m_handTracked[(size_t) handIndex];
     }
 
     bool HL2Interactions::IsJointTracked(HL2UnityPlugin::HandIndex handIndex, HL2UnityPlugin::HandJointIndex jointIndex)
     {
-        return m_handTracked[handIndex] && m_hand[handIndex].handJoints[jointIndex].tracked;
+        if (!m_handTracked[(size_t) handIndex]) return false;
+
+        const auto &hand = m_hand[(size_t) handIndex];
+        if (hand.handJoints.size() <= (size_t) jointIndex) {
+            return false;
+        } else {
+            return hand.handJoints[(size_t) jointIndex].tracked;
+        }
     }
 
     Windows::Foundation::Numerics::float4x4 HL2Interactions::GetOrientedJoint(HL2UnityPlugin::HandIndex handIndex, HL2UnityPlugin::HandJointIndex jointIndex)
     {
-        throw XMMATRIXToFloat4x4(m_hand[handIndex].handJoints[jointIndex].transformation);
+        const auto &hand = m_hand[(size_t) handIndex];
+        if (hand.handJoints.size() <= (size_t) jointIndex) {
+            return XMMATRIXToFloat4x4(XMMatrixIdentity());
+        } else {
+            return XMMATRIXToFloat4x4(hand.handJoints[(size_t) jointIndex].transformation);
+        }
     }
 
     void HL2Interactions::EnableEyeTracking()
@@ -216,7 +230,7 @@ namespace winrt::HL2UnityPlugin::implementation
         return ret;
     }
 
-    Windows::Foundation::Numerics::float4 HL2Interactions::XMMATRIXToFloat4x4(const XMMATRIX &matrix) 
+    Windows::Foundation::Numerics::float4x4 HL2Interactions::XMMATRIXToFloat4x4(const XMMATRIX &matrix) 
     {
         Windows::Foundation::Numerics::float4x4 ret;
         XMStoreFloat4x4(&ret, matrix);

@@ -81,17 +81,19 @@ public class TCPClient : MonoBehaviour
     }
 
     bool lastMessageSent = true;
-    public async void SendUINT16Async(ushort[] data)
+    public async void SendUINT16Async(string header, ushort[] data)
     {
         if (!lastMessageSent) return;
         lastMessageSent = false;
         try
         {
             // Write header
-            dw.WriteString("d"); // header
+            dw.WriteString(header);
 
-            // Write point cloud
-            dw.WriteInt32(data.Length);
+            // Write length in bytes
+            dw.WriteInt32(data.Length * sizeof(ushort));
+
+            // Write actual data
             dw.WriteBytes(UINT16ToBytes(data));
 
             // Send out
@@ -106,17 +108,17 @@ public class TCPClient : MonoBehaviour
         lastMessageSent = true;
     }
 
-    public async void SendUINT16Async(ushort[] data1, ushort[] data2)
+    public async void SendUINT16Async(string header, ushort[] data1, ushort[] data2)
     {
-        if (!lastMessageSent) return;
-        lastMessageSent = false;
+        // if (!lastMessageSent) return;
+        // lastMessageSent = false;
         try
         {
             // Write header
-            dw.WriteString("s"); // header "s" stands for it is ushort array (uint16)
+            dw.WriteString(header);
 
-            // Write Length
-            dw.WriteInt32(data1.Length + data2.Length);
+            // Write length in bytes
+            dw.WriteInt32((data1.Length + data2.Length) * sizeof(ushort));
 
             // Write actual data
             dw.WriteBytes(UINT16ToBytes(data1));
@@ -134,17 +136,19 @@ public class TCPClient : MonoBehaviour
         lastMessageSent = true;
     }
 
-    public async void SendFloatAsync(float[] data)
+    public async void SendFloatAsync(string header, float[] data)
     {
-        if (!lastMessageSent) return;
-        lastMessageSent = false;
+        // if (!lastMessageSent) return;
+        // lastMessageSent = false;
         try
         {
             // Write header
-            dw.WriteString("r"); // header
+            dw.WriteString(header);
 
-            // Write point cloud
-            dw.WriteInt32(data.Length);
+            // Write length in bytes
+            dw.WriteInt32(data.Length * sizeof(float));
+            
+            // Write actual data
             dw.WriteBytes(FloatToBytes(data));
 
             // Send out
@@ -159,6 +163,7 @@ public class TCPClient : MonoBehaviour
         lastMessageSent = true;
     }
 
+    // TODO: [Zikai] the convention is inconsistent with above, but we are not using them for now
     public async void SendSpatialImageAsync(byte[] LFImage, byte[] RFImage, long ts_left, long ts_right)
     {
         if (!lastMessageSent) return;

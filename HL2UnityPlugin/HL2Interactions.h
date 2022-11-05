@@ -3,6 +3,8 @@
 #include <thread>
 #include <DirectXMath.h>
 #include <winrt/Windows.Perception.Spatial.h>
+#include <winrt/Windows.Perception.People.h>
+#include <winrt/Windows.UI.Input.Spatial.h>
 
 namespace winrt::HL2UnityPlugin::implementation
 {
@@ -48,11 +50,11 @@ namespace winrt::HL2UnityPlugin::implementation
         DirectX::XMVECTOR m_headPosition;
         DirectX::XMVECTOR m_headForwardDirection;
         DirectX::XMVECTOR m_headUpDirection;
-        DirectX::XMVECTOR m_headTransform;
+        DirectX::XMMATRIX m_headTransform;
 
         bool m_isArticulatedHandTrackingAPIAvailable;	// True if articulated hand tracking API is available
-        bool m_handTracked[HL2UnityPlugin::HandIndex::Count];
-        Hand m_hand[HL2UnityPlugin::HandIndex::Count];
+        bool m_handTracked[(size_t) HL2UnityPlugin::HandIndex::Count];
+        Hand m_hand[(size_t) HL2UnityPlugin::HandIndex::Count];
 
         bool m_isEyeTrackingAvailable;	// True if system supports eye tracking APIs and an eye tracking system is available
         bool m_isEyeTrackingRequested;	// True if app requested to enable eye tracking
@@ -61,10 +63,11 @@ namespace winrt::HL2UnityPlugin::implementation
         DirectX::XMVECTOR m_eyeGazeOrigin;
         DirectX::XMVECTOR m_eyeGazeDirection;
 
+        Windows::UI::Input::Spatial::SpatialInteractionManager m_spatialInteractionManager = nullptr;
         Windows::Perception::Spatial::SpatialCoordinateSystem m_refFrame = nullptr;
 
-        static Windows::Foundation::Numerics::float4 HL2Interactions::XMVECTORToFloat4(const XMVECTOR &vector);
-        static Windows::Foundation::Numerics::float4 HL2Interactions::XMMATRIXToFloat4x4(const XMMATRIX &matrix);
+        static Windows::Foundation::Numerics::float4 HL2Interactions::XMVECTORToFloat4(const DirectX::XMVECTOR &vector);
+        static Windows::Foundation::Numerics::float4x4 HL2Interactions::XMMATRIXToFloat4x4(const DirectX::XMMATRIX &matrix);
     };
 }
 namespace winrt::HL2UnityPlugin::factory_implementation
