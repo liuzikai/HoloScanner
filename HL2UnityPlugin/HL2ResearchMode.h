@@ -39,7 +39,7 @@ namespace winrt::HL2UnityPlugin::implementation
         void InitializeGyroSensor();
         void InitializeMagSensor();
 
-        void StartDepthSensorLoop(bool reconstructPointCloud = true);
+        void StartDepthSensorLoop(bool enableABImage = true, bool enablePreview = true, bool reconstructPointCloud = true);
         void StartLongDepthSensorLoop(bool reconstructPointCloud = true);
         void StartSpatialCamerasFrontLoop();
         void StartAccelSensorLoop();
@@ -110,6 +110,7 @@ namespace winrt::HL2UnityPlugin::implementation
         ResearchModeSensorTimestamp m_depthTimestamp;
         DirectX::XMMATRIX m_rigToWorld;
         float* m_depthLUT = nullptr;
+        DirectX::XMVECTOR* m_depthLUTPoint = nullptr;
 
 		UINT8* m_LFImage = nullptr;
 		UINT8* m_RFImage = nullptr;
@@ -164,6 +165,8 @@ namespace winrt::HL2UnityPlugin::implementation
         std::atomic_bool m_gyroSampleUpdated = false;
         std::atomic_bool m_magSampleUpdated = false;
 
+        std::atomic_bool m_enableShortThrowABImage = false;
+        std::atomic_bool m_enableShortThrowPreview = false;
         std::atomic_bool m_reconstructShortThrowPointCloud = false;
         std::atomic_bool m_reconstructLongThrowPointCloud = false;
 

@@ -173,7 +173,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &119160457
 Transform:
   m_ObjectHideFlags: 0
@@ -306,7 +306,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Toggle AHAT Recording
+  m_text: Toggle AHAT Streaming
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6a84f857bec7e7345843ae29404c57ce, type: 2}
   m_sharedMaterial: {fileID: 21202819797275496, guid: 6a84f857bec7e7345843ae29404c57ce,
@@ -866,7 +866,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &349520857
 Transform:
   m_ObjectHideFlags: 0
@@ -990,7 +990,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!64 &446940271
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -1119,7 +1119,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &456786860
 Transform:
   m_ObjectHideFlags: 0
@@ -1414,7 +1414,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Connect to server
+  m_text: Connect to Server
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6a84f857bec7e7345843ae29404c57ce, type: 2}
   m_sharedMaterial: {fileID: 21202819797275496, guid: 6a84f857bec7e7345843ae29404c57ce,
@@ -1811,6 +1811,7 @@ MonoBehaviour:
   - 192.168.1.107
   port: 9090
   ConnectionStatusLED: {fileID: 1648274831}
+  ConnectButtonText: {fileID: 601307470}
   videoStream: {fileID: 891080480}
   MaxPendingMessageCount: 20
 --- !u!114 &891080483
@@ -1843,7 +1844,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!64 &891683167
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -4994,7 +4995,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!64 &1942013570
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -6413,7 +6414,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Stop
+  m_text: Exit
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 6a84f857bec7e7345843ae29404c57ce, type: 2}
   m_sharedMaterial: {fileID: 21202819797275496, guid: 6a84f857bec7e7345843ae29404c57ce,
@@ -6742,7 +6743,7 @@ MonoBehaviour:
   smoothing: 1
   lifetime: 0
   orientationType: 4
-  faceTrackedObjectWhileClamped: 1
+  faceTrackedObjectWhileClamped: 0
   faceUserDefinedTargetTransform: 0
   targetToFace: {fileID: 0}
   pivotAxis: 7
@@ -8398,8 +8399,8 @@ MonoBehaviour:
   OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 891080480}
-        m_MethodName: StopSensorsEvent
+      - m_Target: {fileID: 891080483}
+        m_MethodName: Exit
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

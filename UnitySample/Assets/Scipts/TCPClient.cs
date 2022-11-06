@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
+using TMPro;
 //using System.Runtime.Serialization.Formatters.Binary;
 #if WINDOWS_UWP
 using Windows.Networking.Sockets;
@@ -34,7 +37,9 @@ public class TCPClient : MonoBehaviour
     string port;
 
     public Renderer ConnectionStatusLED;
+    public TMP_Text ConnectButtonText;
     public bool Connected { get; private set; } = false;
+    public string ConnectedHostIP { get; private set; }
 
     public ResearchModeVideoStream videoStream;
 
@@ -47,28 +52,57 @@ public class TCPClient : MonoBehaviour
     public DataReader dr;
     private async void StartConnection()
     {
-        if(socket != null) socket.Dispose();
-        socket = new StreamSocket();
+        if (ConnectionStatusLED.material.color == Color.yellow) return;  // already trying to connect
+        ConnectionStatusLED.material.color = Color.yellow;
 
         foreach(var hostIPAddress in hostIPAddresses)
         {
             try
             {
+                if(socket != null) socket.Dispose();
+                socket = new StreamSocket();
+
                 var hostName = new Windows.Networking.HostName(hostIPAddress);
-                await socket.ConnectAsync(hostName, port);
-                dw = new DataWriter(socket.OutputStream);
-                dr = new DataReader(socket.InputStream);
-                dr.InputStreamOptions = InputStreamOptions.Partial;
-                Connected = true;
-                ConnectionStatusLED.material.color = Color.green;
-                break;
+                ConnectButtonText.text = "Trying " + ConnectedHostIP;
+
+                var cts = new CancellationTokenSource();
+                cts.CancelAfter(2000);  // cancel after 2 seconds
+                var connectAsync = socket.ConnectAsync(hostName, port);
+
+                var connectTask = connectAsync.AsTask(cts.Token);
+                try
+                {
+                    await connectTask;   
+                }
+                catch (TaskCanceledException)
+                {
+                    socket.Dispose();
+                    continue;  // try the next host
+                }
             }
             catch (Exception ex)
             {
                 SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
-                Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
+                ConnectButtonText.text = webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message;
+                continue;
             }
+                
+            // Connected
+            ConnectedHostIP = hostIPAddress;
+            dw = new DataWriter(socket.OutputStream);
+            dr = new DataReader(socket.InputStream);
+            dr.InputStreamOptions = InputStreamOptions.Partial;
+
+            Connected = true;
+            ConnectionStatusLED.material.color = Color.green;
+            ConnectButtonText.text = "Disconnect from " + ConnectedHostIP;
+            return;
         }
+
+        // Fail to connect
+        socket?.Dispose();
+        ConnectionStatusLED.material.color = Color.red;
+        // ConnectButtonText.text = "Connect to Server";
     }
 
     private void StopConnection()
@@ -86,6 +120,7 @@ public class TCPClient : MonoBehaviour
         socket?.Dispose();
         Connected = false;
         ConnectionStatusLED.material.color = Color.red;
+        ConnectButtonText.text = "Connect to Server";
 
         PendingMessageCount = 0;
     }

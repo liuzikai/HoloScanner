@@ -20,4 +20,8 @@ public class KeyboardCommand : MonoBehaviour
         }
 #endif
     }
+
+    public void Exit() {
+        Application.Quit();
+    }
 }

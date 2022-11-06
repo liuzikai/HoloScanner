@@ -66,8 +66,8 @@ namespace winrt::HL2UnityPlugin::implementation
         Windows::UI::Input::Spatial::SpatialInteractionManager m_spatialInteractionManager = nullptr;
         Windows::Perception::Spatial::SpatialCoordinateSystem m_refFrame = nullptr;
 
-        static Windows::Foundation::Numerics::float4 HL2Interactions::XMVECTORToFloat4(const DirectX::XMVECTOR &vector);
-        static Windows::Foundation::Numerics::float4x4 HL2Interactions::XMMATRIXToFloat4x4(const DirectX::XMMATRIX &matrix);
+        static Windows::Foundation::Numerics::float4 XMVECTORToFloat4(const DirectX::XMVECTOR &vector);
+        static Windows::Foundation::Numerics::float4x4 XMMATRIXToFloat4x4(const DirectX::XMMATRIX &matrix);
     };
 }
 namespace winrt::HL2UnityPlugin::factory_implementation

@@ -65,7 +65,7 @@ namespace HL2UnityPlugin
         void InitializeMagSensor();
 
         void StartDepthSensorLoop();
-        void StartDepthSensorLoop(Boolean reconstructPointCloud);
+        void StartDepthSensorLoop(Boolean enableABImage, Boolean enablePreview, Boolean reconstructPointCloud);
         void StartLongDepthSensorLoop();
         void StartLongDepthSensorLoop(Boolean reconstructPointCloud);
 		void StartSpatialCamerasFrontLoop();

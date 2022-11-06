@@ -161,7 +161,7 @@ public class ResearchModeVideoStream : MonoBehaviour
 
         // Depth sensor should be initialized in only one mode
         if (depthSensorMode == DepthSensorMode.LongThrow) researchMode.StartLongDepthSensorLoop(enablePointCloud);
-        else if (depthSensorMode == DepthSensorMode.ShortThrow) researchMode.StartDepthSensorLoop(enablePointCloud);
+        else if (depthSensorMode == DepthSensorMode.ShortThrow) researchMode.StartDepthSensorLoop(false, false, enablePointCloud);
 
         researchMode.StartSpatialCamerasFrontLoop();
 
@@ -174,21 +174,26 @@ public class ResearchModeVideoStream : MonoBehaviour
 #endif
     }
 
-    bool startRealtimePreview = true;
+    bool startRealtimePreview = false;
     void LateUpdate()
     {
 #if ENABLE_WINMD_SUPPORT
         bool ahatUpdated = false;
-        // DepthMapTextureUpdated() and ShortAbImageTextureUpdated() are set to true at the same time.
-        // HL2UnityPlugin/HL2ResearchMode.cpp:342
-        // As m_depthMapTextureUpdated is set later then m_shortAbImageTextureUpdated, we use it as the flag
-        // to avoid aync problem.
+
+        if (depthSensorMode == DepthSensorMode.ShortThrow && researchMode.DepthMapTextureUpdated()) 
+        {
+            /*
+             * DepthMapTextureUpdated() and ShortAbImageTextureUpdated() are set to true at the same time (HL2UnityPlugin/HL2ResearchMode.cpp:342)
+             * As m_depthMapTextureUpdated is set later then m_shortAbImageTextureUpdated, we use it as the flag to avoid aync problem.
+             */
+            ahatUpdated = true;
+        }
 
         // update depth map texture
         if (depthSensorMode == DepthSensorMode.ShortThrow && startRealtimePreview && 
             depthPreviewPlane != null && researchMode.DepthMapTextureUpdated())
         {
-            ahatUpdated = true;
+            
             byte[] frameTexture = researchMode.GetDepthMapTextureBuffer();
             if (frameTexture.Length > 0)
             {

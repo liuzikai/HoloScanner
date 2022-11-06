@@ -148,13 +148,15 @@ namespace winrt::HL2UnityPlugin::implementation
         }
     }
 
-    void HL2ResearchMode::StartDepthSensorLoop(bool reconstructPointCloud)
+    void HL2ResearchMode::StartDepthSensorLoop(bool enableABImage, bool enablePreview, bool reconstructPointCloud)
     {
         //std::thread th1([this] {this->DepthSensorLoopTest(); });
         if (reconstructPointCloud && m_refFrame == nullptr)
         {
             m_refFrame = m_locator.GetDefault().CreateStationaryFrameOfReferenceAtCurrentLocation().CoordinateSystem();
         }
+        m_enableShortThrowABImage = enableABImage;
+        m_enableShortThrowPreview = enablePreview;
         m_reconstructShortThrowPointCloud = reconstructPointCloud;
 
         m_pDepthUpdateThread = new std::thread(HL2ResearchMode::DepthSensorLoop, this);
@@ -184,29 +186,35 @@ namespace winrt::HL2UnityPlugin::implementation
                 pDepthSensorFrame->GetResolution(&resolution);
                 pHL2ResearchMode->m_depthResolution = resolution;
                 
-                // Generate AHaT LUT
+                // generate AHaT LUT
                 if (!pHL2ResearchMode->m_depthLUT) {
                     std::lock_guard<std::mutex> l(pHL2ResearchMode->mu);
 
                     pHL2ResearchMode->m_depthLUT = new float[(size_t) resolution.Width * (size_t) resolution.Height * 3];
-                    if (!pHL2ResearchMode->m_depthLUT) continue;
+                    float* pLUT = pHL2ResearchMode->m_depthLUT;
+                    
+                    pHL2ResearchMode->m_depthLUTPoint = new XMVECTOR[(size_t) resolution.Width * (size_t)resolution.Height];
+                    XMVECTOR* pLUTPoint = pHL2ResearchMode->m_depthLUTPoint;
 
                     float uv[2];
-                    float xy[2];
                     for (size_t y = 0; y < resolution.Height; y++)
                     {
                         uv[1] = (y + 0.5f);
                         for (size_t x = 0; x < resolution.Width; x++)
                         {
                             uv[0] = (x + 0.5f);
+
+                            float xy[2] = {0, 0};
                             HRESULT hr = pHL2ResearchMode->m_pDepthCameraSensor->MapImagePointToCameraUnitPlane(uv, xy);
                             if (FAILED(hr))
                             {
-                                *pHL2ResearchMode->m_depthLUT++ = xy[0];
-                                *pHL2ResearchMode->m_depthLUT++ = xy[1];
-                                *pHL2ResearchMode->m_depthLUT++ = 0.f;
+                                *pLUT++ = xy[0];
+                                *pLUT++ = xy[1];
+                                *pLUT++ = 0.f;
+                                *pLUTPoint++ = XMLoadFloat3((const XMFLOAT3 *) (pLUT - 3));
                                 continue;
                             }
+                            
                             float z = 1.0f;
                             const float norm = sqrtf(xy[0] * xy[0] + xy[1] * xy[1] + z * z);
                             const float invNorm = 1.0f / norm;
@@ -214,10 +222,11 @@ namespace winrt::HL2UnityPlugin::implementation
                             xy[1] *= invNorm;
                             z *= invNorm;
 
-                            // Dump LUT row
-                            *pHL2ResearchMode->m_depthLUT++ = xy[0];
-                            *pHL2ResearchMode->m_depthLUT++ = xy[1];
-                            *pHL2ResearchMode->m_depthLUT++ = z;
+                            // dump LUT row
+                            *pLUT++ = xy[0];
+                            *pLUT++ = xy[1];
+                            *pLUT++ = z;
+                            *pLUTPoint++ = XMLoadFloat3((const XMFLOAT3 *) (pLUT - 3));
                         }
                     }    
                 }
@@ -229,12 +238,18 @@ namespace winrt::HL2UnityPlugin::implementation
                 const UINT16* pDepth = nullptr;
                 pDepthFrame->GetBuffer(&pDepth, &outBufferCount);
                 pHL2ResearchMode->m_depthBufferSize = outBufferCount;
+
                 size_t outAbBufferCount = 0;
                 const UINT16* pAbImage = nullptr;
-                pDepthFrame->GetAbDepthBuffer(&pAbImage, &outAbBufferCount);
+                if (pHL2ResearchMode->m_enableShortThrowABImage)
+                    pDepthFrame->GetAbDepthBuffer(&pAbImage, &outAbBufferCount);
 
-                auto pDepthTexture = std::make_unique<uint8_t[]>(outBufferCount);
-                auto pAbTexture = std::make_unique<uint8_t[]>(outAbBufferCount);
+                std::unique_ptr<uint8_t[]> pDepthTexture;
+                if (pHL2ResearchMode->m_enableShortThrowPreview)
+                    pDepthTexture = std::make_unique<uint8_t[]>(outBufferCount);
+                std::unique_ptr<uint8_t[]> pAbTexture;
+                if (pHL2ResearchMode->m_enableShortThrowABImage && pHL2ResearchMode->m_enableShortThrowPreview)
+                    pAbTexture = std::make_unique<uint8_t[]>(outAbBufferCount);
                 std::vector<float> pointCloud;
 
                 ResearchModeSensorTimestamp timestamp;
@@ -247,7 +262,6 @@ namespace winrt::HL2UnityPlugin::implementation
                 Windows::Perception::Spatial::SpatialLocation transToWorld = nullptr;
                 auto ts = PerceptionTimestampHelper::FromSystemRelativeTargetTime(HundredsOfNanoseconds(checkAndConvertUnsigned(timestamp.HostTicks)));
                 transToWorld = pHL2ResearchMode->m_locator.TryLocateAtTimestamp(ts, pHL2ResearchMode->m_refFrame);
-                // TODO: [Zikai] transToWorld? Is this an accurate name?
                 if (transToWorld == nullptr) continue;
                 
                 XMMATRIX transToWorldMatrix = SpatialLocationToDxMatrix(transToWorld);
@@ -276,11 +290,15 @@ namespace winrt::HL2UnityPlugin::implementation
                                 j > pHL2ResearchMode->depthCamRoi.kColLower * resolution.Width && j < pHL2ResearchMode->depthCamRoi.kColUpper * resolution.Width &&
                                 depth > pHL2ResearchMode->depthCamRoi.depthNearClip && depth < pHL2ResearchMode->depthCamRoi.depthFarClip)
                             {
-                                float xy[2] = { 0, 0 };
+                                /* float xy[2] = { 0, 0 };
                                 float uv[2] = { j, i };
                                 pHL2ResearchMode->m_pDepthCameraSensor->MapImagePointToCameraUnitPlane(uv, xy);
                                 auto pointOnUnitPlane = XMFLOAT3(xy[0], xy[1], 1);
-                                auto tempPoint = (float)depth / 1000 * XMVector3Normalize(XMLoadFloat3(&pointOnUnitPlane));
+                                auto tempPoint = (float)depth / 1000 * XMVector3Normalize(XMLoadFloat3(&pointOnUnitPlane)); */
+                                
+                                // optimize with LUT
+                                auto tempPoint = (float) depth / 1000 * pHL2ResearchMode->m_depthLUTPoint[idx];
+                                
                                 // apply transformation
                                 auto pointInWorld = XMVector3Transform(tempPoint, depthToWorld);
 
@@ -295,17 +313,22 @@ namespace winrt::HL2UnityPlugin::implementation
                             }
                         }
 
-                        // save depth map as grayscale texture pixel into temp buffer
-                        if (depth == 0) { pDepthTexture.get()[idx] = 0; }
-                        else { pDepthTexture.get()[idx] = (uint8_t)((float)depth / 1000 * 255); }
+                        if (pHL2ResearchMode->m_enableShortThrowPreview)
+                        {
+                            // save depth map as grayscale texture pixel into temp buffer
+                            if (depth == 0) { pDepthTexture.get()[idx] = 0; }
+                            else { pDepthTexture.get()[idx] = (uint8_t)((float)depth / 1000 * 255); }
+                        }
 
-                        // save AbImage as grayscale texture pixel into temp buffer
-                        UINT16 abValue = pAbImage[idx];
-                        uint8_t processedAbValue = 0;
-                        if (abValue > 1000) { processedAbValue = 0xFF; }
-                        else { processedAbValue = (uint8_t)((float)abValue / 1000 * 255); }
-
-                        pAbTexture.get()[idx] = processedAbValue;
+                        if (pHL2ResearchMode->m_enableShortThrowABImage && pHL2ResearchMode->m_enableShortThrowPreview)
+                        {
+                            // save AbImage as grayscale texture pixel into temp buffer
+                            UINT16 abValue = pAbImage[idx];
+                            uint8_t processedAbValue = 0;
+                            if (abValue > 1000) { processedAbValue = 0xFF; }
+                            else { processedAbValue = (uint8_t)((float)abValue / 1000 * 255); }
+                            pAbTexture.get()[idx] = processedAbValue;
+                        }
 
                         // save the depth of center pixel
                         if (pHL2ResearchMode->m_reconstructShortThrowPointCloud && 
@@ -350,29 +373,38 @@ namespace winrt::HL2UnityPlugin::implementation
                     }
                     memcpy(pHL2ResearchMode->m_depthMap, pDepth, outBufferCount * sizeof(UINT16));
 
-                    // save pre-processed depth map texture (for visualization)
-                    if (!pHL2ResearchMode->m_depthMapTexture)
+                    if (pHL2ResearchMode->m_enableShortThrowPreview)
                     {
-                        OutputDebugString(L"Create Space for depth map texture...\n");
-                        pHL2ResearchMode->m_depthMapTexture = new UINT8[outBufferCount];
+                        // save pre-processed depth map texture (for visualization)
+                        if (!pHL2ResearchMode->m_depthMapTexture)
+                        {
+                            OutputDebugString(L"Create Space for depth map texture...\n");
+                            pHL2ResearchMode->m_depthMapTexture = new UINT8[outBufferCount];
+                        }
+                        memcpy(pHL2ResearchMode->m_depthMapTexture, pDepthTexture.get(), outBufferCount * sizeof(UINT8));
                     }
-                    memcpy(pHL2ResearchMode->m_depthMapTexture, pDepthTexture.get(), outBufferCount * sizeof(UINT8));
 
-                    // save raw AbImage
-                    if (!pHL2ResearchMode->m_shortAbImage)
+                    if (pHL2ResearchMode->m_enableShortThrowABImage)
                     {
-                        OutputDebugString(L"Create Space for short AbImage...\n");
-                        pHL2ResearchMode->m_shortAbImage = new UINT16[outBufferCount];
+                        // save raw AbImage
+                        if (!pHL2ResearchMode->m_shortAbImage)
+                        {
+                            OutputDebugString(L"Create Space for short AbImage...\n");
+                            pHL2ResearchMode->m_shortAbImage = new UINT16[outBufferCount];
+                        }
+                        memcpy(pHL2ResearchMode->m_shortAbImage, pAbImage, outBufferCount * sizeof(UINT16));
                     }
-                    memcpy(pHL2ResearchMode->m_shortAbImage, pAbImage, outBufferCount * sizeof(UINT16));
 
-                    // save pre-processed AbImage texture (for visualization)
-                    if (!pHL2ResearchMode->m_shortAbImageTexture)
+                    if (pHL2ResearchMode->m_enableShortThrowABImage && pHL2ResearchMode->m_enableShortThrowPreview)
                     {
-                        OutputDebugString(L"Create Space for short AbImage texture...\n");
-                        pHL2ResearchMode->m_shortAbImageTexture = new UINT8[outBufferCount];
+                        // save pre-processed AbImage texture (for visualization)
+                        if (!pHL2ResearchMode->m_shortAbImageTexture)
+                        {
+                            OutputDebugString(L"Create Space for short AbImage texture...\n");
+                            pHL2ResearchMode->m_shortAbImageTexture = new UINT8[outBufferCount];
+                        }
+                        memcpy(pHL2ResearchMode->m_shortAbImageTexture, pAbTexture.get(), outBufferCount * sizeof(UINT8));
                     }
-                    memcpy(pHL2ResearchMode->m_shortAbImageTexture, pAbTexture.get(), outBufferCount * sizeof(UINT8));
 
                     // save timestamp
                     pHL2ResearchMode->m_depthTimestamp = timestamp;
