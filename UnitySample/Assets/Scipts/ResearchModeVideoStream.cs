@@ -65,16 +65,17 @@ public class ResearchModeVideoStream : MonoBehaviour
     Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
 #endif
 
-    public Renderer ahatRecordingLED;
-    private bool ahatRecording = false;
-    public bool AHATRecording {
-        get { return ahatRecording; }
-    }
-    private bool ahatLUTSent = false;
+    private bool AHATLUTSent = false;
+
+    public Renderer AHATStreamingLED;
+    public bool AHATStreaming { get; private set; } = false;
+
+    public Renderer PointCloudStreamingLED;
+    public bool PointCloudStreaming { get; private set; } = false;
 
     private void Awake()
     {
-        ahatRecordingLED.material.color = Color.red;
+        AHATStreamingLED.material.color = Color.red;
 #if ENABLE_WINMD_SUPPORT
 #if UNITY_2020_1_OR_NEWER // note: Unity 2021.2 and later not supported
         IntPtr WorldOriginPtr = UnityEngine.XR.WindowsMR.WindowsMREnvironment.OriginSpatialCoordinateSystem;
@@ -233,18 +234,18 @@ public class ResearchModeVideoStream : MonoBehaviour
             }
         }
 
-        if (ahatRecording && ahatUpdated) 
+        if (AHATStreaming && ahatUpdated) 
         {
-            if (!ahatLUTSent) 
+            if (!AHATLUTSent) 
             {
                 if (SendAHATLUTData())
                 {
-                    ahatLUTSent = true;
-                    ahatRecordingLED.material.color = Color.green;
+                    AHATLUTSent = true;
+                    AHATStreamingLED.material.color = Color.green;
                 }
             }
 
-            if (ahatLUTSent)
+            if (AHATLUTSent)
             {
                 // Measurements shows that the following call only takes 1-2ms
                 interactions.Update(researchMode.GetDepthUpdateTimestamp());
@@ -337,7 +338,9 @@ public class ResearchModeVideoStream : MonoBehaviour
         }
 
         // Update point cloud
-        UpdatePointCloud();
+        if (ahatUpdated) {  // TODO: long-throw is ignored for now
+            UpdatePointCloud();
+        }
 #endif
     }
 
@@ -374,6 +377,11 @@ public class ResearchModeVideoStream : MonoBehaviour
                     text.text += "\n"+ "TCP Pending: " + tcpClient.PendingMessageCount.ToString();
                 }
                 pointCloudRenderer.Render(pointCloudVector3, pointColor);
+
+                // Send point cloud
+                if (PointCloudStreaming) {
+                    tcpClient.SendFloatAsync("p", pointCloud);
+                }
             }
         }
     }
@@ -408,23 +416,36 @@ public class ResearchModeVideoStream : MonoBehaviour
         startRealtimePreview = false;
     }
 
-    public void ToggleAHATRecordingEvent() {
-        if (!ahatRecording) {
+    public void ToggleAHATStreamingEvent() {
+        if (!AHATStreaming) {
             if (tcpClient.Connected) {
-                ahatRecording = true;
-                ahatLUTSent = false;
-                ahatRecordingLED.material.color = Color.yellow;
+                AHATStreaming = true;
+                AHATLUTSent = false;
+                AHATStreamingLED.material.color = Color.yellow;
 
 #if ENABLE_WINMD_SUPPORT
                 var data = new List<float>();
                 SerializeMatrix4x4Transposed(data, researchMode.GetDepthExtrinsics());
-                tcpClient.SendFloatAsync("e", data.ToArray());
+                tcpClient.SendFloatAsync("e", data.ToArray(), false);  // must not be dropped
 #endif
             }
             
         } else {
-            ahatRecording = false;
-            ahatRecordingLED.material.color = Color.red;
+            AHATStreaming = false;
+            AHATStreamingLED.material.color = Color.red;
+        }
+    }
+
+    public void TogglePointCloudStreammingEvent() {
+        if (!PointCloudStreaming) {
+            if (tcpClient.Connected) {
+                PointCloudStreaming = true;
+                PointCloudStreamingLED.material.color = Color.yellow;
+            }
+            
+        } else {
+            PointCloudStreaming = false;
+            PointCloudStreamingLED.material.color = Color.red;
         }
     }
 
@@ -463,8 +484,8 @@ public class ResearchModeVideoStream : MonoBehaviour
 #if WINDOWS_UWP
         if (tcpClient != null)
         {
-            tcpClient.SendFloatAsync("l", ahatLUT);
-            return true;  // here we just assume the sent will succeed
+            tcpClient.SendFloatAsync("l", ahatLUT, false);  // must not drop
+            return true;
         }
 #endif
 #endif

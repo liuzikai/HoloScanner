@@ -28,6 +28,9 @@ def tcp_server():
         print('Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1])
         return
 
+    cv2.imshow('AHaT', np.zeros((512, 512), np.uint8))
+    cv2.waitKey(1)
+
     sSock.listen(10)
     print('Start listening...')
     sSock.settimeout(3.0)
@@ -64,7 +67,7 @@ def tcp_server():
         frame_counts[header] += 1
         current_time = time.time()
         if current_time - last_stat_time > 1:
-            print("[Stats]", "    ".join([f"{key}: {round(value / (current_time - last_stat_time))} fps" for key, value in frame_counts.items()]))
+            # print("[Stats]", "    ".join([f"{key}: {round(value / (current_time - last_stat_time))} fps" for key, value in frame_counts.items()]))
             frame_counts.clear()
             last_stat_time = current_time
         
@@ -106,7 +109,7 @@ def tcp_server():
 
             left_hand_present = (f[16] == 1.0)
             right_hand_present = (f[16 + 1 + 26 * 16] == 1.0)
-            # print(f"Left hand present: {int(left_hand_present)}   Right hand present: {int(right_hand_present)}")
+            print(f"Left hand present: {int(left_hand_present)}   Right hand present: {int(right_hand_present)}")
 
             
 

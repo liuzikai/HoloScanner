@@ -361,5 +361,4 @@ data/
 
 .idea/
 .fleet/
-HackedIncludes/
-CMakeLists.txt
+cmake-build-*

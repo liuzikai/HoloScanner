@@ -47,6 +47,24 @@ public class TCPClient : MonoBehaviour
     public int MaxPendingMessageCount = 20;
 
 #if WINDOWS_UWP
+    /**
+     * Package structure:
+     *  1-byte PREAMBLE (defined below)
+     *  uint8_t package type (enum PackageType)
+     *  NUL-terminated string for name
+     *  uint32_t content size
+     *  bytes
+     */
+
+    static const byte Preamble = 0xCE;
+    enum PackageType {
+        SignleString,
+        SingleInt,
+        Bytes,
+        ListOfString,
+        PackageTypeCount,
+    };
+
     StreamSocket socket = null;
     public DataWriter dw;
     public DataReader dr;
@@ -107,7 +125,7 @@ public class TCPClient : MonoBehaviour
 
     private void StopConnection()
     {
-        if (videoStream.AHATRecording) videoStream.ToggleAHATRecordingEvent();
+        if (videoStream.AHATStreaming) videoStream.ToggleAHATStreamingEvent();
 
         dw?.DetachStream();
         dw?.Dispose();
@@ -125,15 +143,18 @@ public class TCPClient : MonoBehaviour
         PendingMessageCount = 0;
     }
 
-    public async void SendUINT16Async(string header, ushort[] data)
+    public async void SendUINT16Async(string header, ushort[] data, bool canDrop = true)
     {
-        if (PendingMessageCount >= MaxPendingMessageCount) return;
+        if (canDrop && PendingMessageCount >= MaxPendingMessageCount) return;
 
         PendingMessageCount++;
         try
         {
             // Write header
+            dw.WriteByte(Preamble);
+            dw.WriteInt32((int) PackageType.Bytes);
             dw.WriteString(header);
+            dw.WriteByte(0);  // NUL-termination
 
             // Write length in bytes
             dw.WriteInt32(data.Length * sizeof(ushort));
@@ -153,15 +174,18 @@ public class TCPClient : MonoBehaviour
         PendingMessageCount--;
     }
 
-    public async void SendFloatAsync(string header, float[] data)
+    public async void SendFloatAsync(string header, float[] data, bool canDrop = true)
     {
-        if (PendingMessageCount >= MaxPendingMessageCount) return;
+        if (canDrop && PendingMessageCount >= MaxPendingMessageCount) return;
 
         PendingMessageCount++;
         try
         {
             // Write header
+            dw.WriteByte(Preamble);
+            dw.WriteInt32((int) PackageType.Bytes);
             dw.WriteString(header);
+            dw.WriteByte(0);  // NUL-termination
 
             // Write length in bytes
             dw.WriteInt32(data.Length * sizeof(float));
