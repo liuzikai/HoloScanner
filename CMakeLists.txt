@@ -4,7 +4,7 @@ project(HoloScanner)
 set(CMAKE_CXX_STANDARD 17)
 
 include_directories(HL2UnityPlugin)
-include_directories(TCPServer)
+include_directories(CPP)
 
 # Find Boost
 find_package(Boost REQUIRED COMPONENTS system filesystem)
@@ -15,17 +15,28 @@ message("Boost ${Boost_VERSION} found: ${Boost_LIBRARIES_STRING}")
 add_subdirectory(CPP/DirectXMath)
 
 # libigl
-option(LIBIGL_OPENGL    "Use OpenGL"   ON)
-option(LIBIGL_GLFW      "Use GLFW"     ON)
-option(LIBIGL_IMGUI     "Use ImGui"    ON)
+option(LIBIGL_OPENGL "Use OpenGL" ON)
+option(LIBIGL_GLFW "Use GLFW" ON)
+option(LIBIGL_IMGUI "Use ImGui" ON)
 add_subdirectory(CPP/libigl)
 message("LIBIGL_INCLUDE_DIR: ${LIBIGL_INCLUDE_DIR}")
 
-add_executable(HoloScannerPCServer
-        CPP/Test.cpp
+add_executable(PCD
         CPP/TerminalSocket.cpp
-        CPP/TCPStreamingSource.cpp)
-target_link_libraries(HoloScannerPCServer
+        CPP/TCPStreamingSource.cpp
+        CPP/Pipelines/PCD.cpp
+        )
+target_link_libraries(PCD
+        ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY}
+        DirectXMath
+        igl::core igl::glfw igl::imgui)
+
+add_executable(DepthToPCD
+        CPP/TerminalSocket.cpp
+        CPP/TCPStreamingSource.cpp
+        CPP/DepthProcessor.cpp
+        CPP/Pipelines/DepthToPCD.cpp)
+target_link_libraries(DepthToPCD
         ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY}
         DirectXMath
         igl::core igl::glfw igl::imgui)
