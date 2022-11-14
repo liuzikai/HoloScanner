@@ -157,7 +157,7 @@ namespace winrt::HL2UnityPlugin::implementation
                         joint.radius = jointPoses[jointIndex].Radius;
                         joint.tracked = (jointPoses[jointIndex].Accuracy == winrt::Windows::Perception::People::JointPoseAccuracy::High);
 
-                        joint.transformation = XMMatrixAffineTransformation(XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f), XMVectorZero(), joint.position, joint.orientation);
+                        joint.transformation = XMMatrixAffineTransformation(XMVectorSet(1.0f, 1.0f, 1.0f, 1.0f), XMVectorZero(), joint.orientation, joint.position);
                     }
                 }
             }

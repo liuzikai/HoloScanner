@@ -70,12 +70,17 @@ public class ResearchModeVideoStream : MonoBehaviour
     public Renderer AHATStreamingLED;
     public bool AHATStreaming { get; private set; } = false;
 
+    public Renderer InteractionStreamingLED;
+    public bool InteractionStreaming { get; private set; } = false;
+
     public Renderer PointCloudStreamingLED;
     public bool PointCloudStreaming { get; private set; } = false;
 
     private void Awake()
     {
-        AHATStreamingLED.material.color = Color.red;
+        if (AHATStreamingLED) AHATStreamingLED.material.color = Color.red;
+        if (InteractionStreamingLED) InteractionStreamingLED.material.color = Color.red;
+        if (PointCloudStreamingLED) PointCloudStreamingLED.material.color = Color.red;
 #if ENABLE_WINMD_SUPPORT
 #if UNITY_2020_1_OR_NEWER // note: Unity 2021.2 and later not supported
         IntPtr WorldOriginPtr = UnityEngine.XR.WindowsMR.WindowsMREnvironment.OriginSpatialCoordinateSystem;
@@ -234,22 +239,28 @@ public class ResearchModeVideoStream : MonoBehaviour
             }
         }
 
-        if (AHATStreaming && ahatUpdated) 
+        if (ahatUpdated) 
         {
-            if (!AHATLUTSent) 
+            if (AHATStreaming)
             {
-                if (SendAHATLUTData())
+                if (!AHATLUTSent) 
                 {
-                    AHATLUTSent = true;
-                    AHATStreamingLED.material.color = Color.green;
+                    if (SendAHATLUTData())
+                    {
+                        AHATLUTSent = true;
+                        AHATStreamingLED.material.color = Color.green;
+                    }
+                }
+
+                if (AHATLUTSent)
+                {
+                    SendAHATDepthData();
                 }
             }
 
-            if (AHATLUTSent)
-            {
-                // Measurements shows that the following call only takes 1-2ms
-                interactions.Update(researchMode.GetDepthUpdateTimestamp());
-                SendAHATDepthData();
+            // Measurements shows that the following call only takes 1-2ms
+            interactions.Update(researchMode.GetDepthUpdateTimestamp());
+            if (InteractionStreaming) {
                 SendInteractionData();
             }
         }
@@ -338,16 +349,14 @@ public class ResearchModeVideoStream : MonoBehaviour
         }
 
         // Update point cloud
-        if (ahatUpdated) {  // TODO: long-throw is ignored for now
-            UpdatePointCloud();
-        }
+        UpdatePointCloud();
 #endif
     }
 
 #if ENABLE_WINMD_SUPPORT
     private void UpdatePointCloud()
     {
-        if (enablePointCloud && renderPointCloud && pointCloudRendererGo != null)
+        if (enablePointCloud && pointCloudRendererGo != null)
         {
             if ((depthSensorMode == DepthSensorMode.LongThrow && !researchMode.LongThrowPointCloudUpdated()) ||
                 (depthSensorMode == DepthSensorMode.ShortThrow && !researchMode.PointCloudUpdated())) return;
@@ -367,7 +376,8 @@ public class ResearchModeVideoStream : MonoBehaviour
                 if (depthSensorMode == DepthSensorMode.ShortThrow) 
                 {
                     text.text = "AHAT ";
-                } else if (depthSensorMode == DepthSensorMode.LongThrow) 
+                } 
+                else if (depthSensorMode == DepthSensorMode.LongThrow) 
                 {
                     text.text = "Long-Throw ";
                 }
@@ -376,10 +386,15 @@ public class ResearchModeVideoStream : MonoBehaviour
                 {
                     text.text += "\n"+ "TCP Pending: " + tcpClient.PendingMessageCount.ToString();
                 }
-                pointCloudRenderer.Render(pointCloudVector3, pointColor);
+
+                if (renderPointCloud)
+                {
+                    pointCloudRenderer.Render(pointCloudVector3, pointColor);
+                }
 
                 // Send point cloud
-                if (PointCloudStreaming) {
+                if (PointCloudStreaming) 
+                {
                     tcpClient.SendFloatAsync("p", pointCloud);
                 }
             }
@@ -417,33 +432,55 @@ public class ResearchModeVideoStream : MonoBehaviour
     }
 
     public void ToggleAHATStreamingEvent() {
-        if (!AHATStreaming) {
-            if (tcpClient.Connected) {
+        if (!AHATStreaming) 
+        {
+            if (tcpClient.Connected) 
+            {
                 AHATStreaming = true;
                 AHATLUTSent = false;
                 AHATStreamingLED.material.color = Color.yellow;
 
 #if ENABLE_WINMD_SUPPORT
                 var data = new List<float>();
-                SerializeMatrix4x4Transposed(data, researchMode.GetDepthExtrinsics());
+                SerializeMatrix4x4(data, researchMode.GetDepthExtrinsics());
                 tcpClient.SendFloatAsync("e", data.ToArray(), false);  // must not be dropped
 #endif
             }
             
-        } else {
+        } else 
+        {
             AHATStreaming = false;
             AHATStreamingLED.material.color = Color.red;
         }
     }
 
-    public void TogglePointCloudStreammingEvent() {
-        if (!PointCloudStreaming) {
-            if (tcpClient.Connected) {
-                PointCloudStreaming = true;
-                PointCloudStreamingLED.material.color = Color.yellow;
+    public void ToggleInteractionStreamingEvent() {
+        if (!InteractionStreaming) 
+        {
+            if (tcpClient.Connected) 
+            {
+                InteractionStreaming = true;
+                InteractionStreamingLED.material.color = Color.green;
             }
             
-        } else {
+        } else 
+        {
+            InteractionStreaming = false;
+            InteractionStreamingLED.material.color = Color.red;
+        }
+    }
+    
+    public void TogglePointCloudStreamingEvent() {
+        if (!PointCloudStreaming) 
+        {
+            if (tcpClient.Connected) 
+            {
+                PointCloudStreaming = true;
+                PointCloudStreamingLED.material.color = Color.green;
+            }
+            
+        } else 
+        {
             PointCloudStreaming = false;
             PointCloudStreamingLED.material.color = Color.red;
         }
@@ -500,11 +537,9 @@ public class ResearchModeVideoStream : MonoBehaviour
 #if WINDOWS_UWP
         if (tcpClient != null)
         {
-            tcpClient.SendUINT16Async("d", depthMap);
-
-            var data = new List<float>();
-            SerializeMatrix4x4Transposed(data, rigToWorld);
-            tcpClient.SendFloatAsync("r", data.ToArray());
+            var rigToWorldData = new List<float>();
+            SerializeMatrix4x4(rigToWorldData, rigToWorld);
+            tcpClient.SendUINT16AndFloatAsync("d", depthMap, rigToWorldData.ToArray());
         }
 #endif
 #endif
@@ -516,7 +551,7 @@ public class ResearchModeVideoStream : MonoBehaviour
         List<float> data = new List<float>();
 
         // Head
-        SerializeMatrix4x4Transposed(data, interactions.GetHeadTransform());
+        SerializeMatrix4x4(data, interactions.GetHeadTransform());
 
         // Hands
         for (int i = 0; i < (int) HandIndex.Count; i++)
@@ -525,8 +560,9 @@ public class ResearchModeVideoStream : MonoBehaviour
             data.Add(interactions.IsHandTracked(handIndex) ? 1.0f : 0.0f);
             for (int j = 0; j < (int) HandJointIndex.Count; j++)
             {
-                // Different with StreamRecorder: not-tracked hand is not zeroed
-                SerializeMatrix4x4Transposed(data, interactions.GetOrientedJoint(handIndex, (HandJointIndex) j));
+                var jointIndex = (HandJointIndex) j;
+                data.Add(interactions.IsJointTracked(handIndex, jointIndex) ? 1.0f : 0.0f);
+                SerializeMatrix4x4(data, interactions.GetOrientedJoint(handIndex, jointIndex));
             }
         }
 
@@ -542,6 +578,27 @@ public class ResearchModeVideoStream : MonoBehaviour
         }
 #endif
 #endif
+    }
+
+    static private void SerializeMatrix4x4(List<float> l, System.Numerics.Matrix4x4 matrix) 
+    {
+        // In row major order
+        l.Add(matrix.M11);
+        l.Add(matrix.M12);
+        l.Add(matrix.M13);
+        l.Add(matrix.M14);
+        l.Add(matrix.M21);
+        l.Add(matrix.M22);
+        l.Add(matrix.M23);
+        l.Add(matrix.M24);
+        l.Add(matrix.M31);
+        l.Add(matrix.M32);
+        l.Add(matrix.M33);
+        l.Add(matrix.M34);
+        l.Add(matrix.M41);
+        l.Add(matrix.M42);
+        l.Add(matrix.M43);
+        l.Add(matrix.M44);
     }
 
     static private void SerializeMatrix4x4Transposed(List<float> l, System.Numerics.Matrix4x4 matrix) 

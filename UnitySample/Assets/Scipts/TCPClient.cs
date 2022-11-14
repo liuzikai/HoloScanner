@@ -56,8 +56,8 @@ public class TCPClient : MonoBehaviour
      *  bytes
      */
 
-    static const byte Preamble = 0xCE;
-    enum PackageType {
+    private const byte Preamble = 0xCE;
+    enum PackageType : byte {
         SignleString,
         SingleInt,
         Bytes,
@@ -108,8 +108,14 @@ public class TCPClient : MonoBehaviour
             // Connected
             ConnectedHostIP = hostIPAddress;
             dw = new DataWriter(socket.OutputStream);
+            dw.UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8;
+            dw.ByteOrder = Windows.Storage.Streams.ByteOrder.LittleEndian;
+
+
             dr = new DataReader(socket.InputStream);
             dr.InputStreamOptions = InputStreamOptions.Partial;
+            dr.UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8;
+            dr.ByteOrder = Windows.Storage.Streams.ByteOrder.LittleEndian;
 
             Connected = true;
             ConnectionStatusLED.material.color = Color.green;
@@ -120,12 +126,14 @@ public class TCPClient : MonoBehaviour
         // Fail to connect
         socket?.Dispose();
         ConnectionStatusLED.material.color = Color.red;
-        // ConnectButtonText.text = "Connect to Server";
+        ConnectButtonText.text = "Connect to Server";
     }
 
     private void StopConnection()
     {
         if (videoStream.AHATStreaming) videoStream.ToggleAHATStreamingEvent();
+        if (videoStream.InteractionStreaming) videoStream.ToggleInteractionStreamingEvent();
+        if (videoStream.PointCloudStreaming) videoStream.TogglePointCloudStreamingEvent();
 
         dw?.DetachStream();
         dw?.Dispose();
@@ -152,7 +160,7 @@ public class TCPClient : MonoBehaviour
         {
             // Write header
             dw.WriteByte(Preamble);
-            dw.WriteInt32((int) PackageType.Bytes);
+            dw.WriteByte((byte) PackageType.Bytes);
             dw.WriteString(header);
             dw.WriteByte(0);  // NUL-termination
 
@@ -161,6 +169,38 @@ public class TCPClient : MonoBehaviour
 
             // Write actual data
             dw.WriteBytes(UINT16ToBytes(data));
+
+            // Send out
+            await dw.StoreAsync();
+            await dw.FlushAsync();
+        }
+        catch (Exception ex)
+        {
+            SocketErrorStatus webErrorStatus = SocketError.GetStatus(ex.GetBaseException().HResult);
+            Debug.Log(webErrorStatus.ToString() != "Unknown" ? webErrorStatus.ToString() : ex.Message);
+        }
+        PendingMessageCount--;
+    }
+
+    public async void SendUINT16AndFloatAsync(string header, ushort[] uint16Data, float[] floatData, bool canDrop = true)
+    {
+        if (canDrop && PendingMessageCount >= MaxPendingMessageCount) return;
+
+        PendingMessageCount++;
+        try
+        {
+            // Write header
+            dw.WriteByte(Preamble);
+            dw.WriteByte((byte) PackageType.Bytes);
+            dw.WriteString(header);
+            dw.WriteByte(0);  // NUL-termination
+
+            // Write length in bytes
+            dw.WriteInt32(uint16Data.Length * sizeof(ushort) + floatData.Length * sizeof(float));
+
+            // Write actual data
+            dw.WriteBytes(UINT16ToBytes(uint16Data));
+            dw.WriteBytes(FloatToBytes(floatData));
 
             // Send out
             await dw.StoreAsync();
@@ -183,7 +223,7 @@ public class TCPClient : MonoBehaviour
         {
             // Write header
             dw.WriteByte(Preamble);
-            dw.WriteInt32((int) PackageType.Bytes);
+            dw.WriteByte((byte) PackageType.Bytes);
             dw.WriteString(header);
             dw.WriteByte(0);  // NUL-termination
 
