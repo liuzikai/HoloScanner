@@ -2,8 +2,8 @@
 // Created by Zikai Liu on 11/12/22.
 //
 
-#ifndef HOLOSCANNER_TCPSTREAMINGSOURCE_H
-#define HOLOSCANNER_TCPSTREAMINGSOURCE_H
+#ifndef HOLOSCANNER_TCPDATASOURCE_H
+#define HOLOSCANNER_TCPDATASOURCE_H
 
 #include "DepthDataTypes.h"
 #include "InteractionDataTypes.h"
@@ -11,11 +11,11 @@
 #include "TerminalSocket.h"
 #include <queue>
 
-class TCPStreamingSource : public AHATSource, public InteractionSource, public PCDSource {
+class TCPDataSource : public AHATSource, public InteractionSource, public PCDSource {
 public:
-    explicit TCPStreamingSource();
+    explicit TCPDataSource();
 
-    ~TCPStreamingSource();
+    ~TCPDataSource();
 
     bool getAHATExtrinsics(DirectX::XMMATRIX &extrinsics) override;
 
@@ -43,12 +43,6 @@ private:
     std::vector<float> ahatLUT;
     std::mutex ahatStaticDataMutex;
 
-    struct AHATFrame {
-        timestamp_t timestamp;
-        AHATDepth depth;
-        DirectX::XMMATRIX rig2world;
-    };
-
     std::queue<AHATFrame> ahatFrames;
     std::mutex ahatFrameMutex;
 
@@ -60,4 +54,4 @@ private:
 };
 
 
-#endif //HOLOSCANNER_TCPSTREAMINGSOURCE_H
+#endif //HOLOSCANNER_TCPDATASOURCE_H

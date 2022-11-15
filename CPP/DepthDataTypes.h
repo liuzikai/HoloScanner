@@ -14,6 +14,12 @@ static constexpr size_t AHAT_HEIGHT = 512;
 using AHATLUT = std::vector<float>;
 using AHATDepth = std::vector<uint16_t>;
 
+struct AHATFrame {
+    timestamp_t timestamp;
+    AHATDepth depth;
+    DirectX::XMMATRIX rig2world;
+};
+
 class AHATSource {
 public:
 

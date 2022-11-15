@@ -13,12 +13,41 @@
 
 #include <iostream>
 
-#include "TCPStreamingSource.h"
+#include "TCPDataSource.h"
 #include "DepthProcessor.h"
 #include "Adapters.h"
+#include "FileDataSource.h"
 
-TCPStreamingSource tcpStreamingSource;
-std::unique_ptr<DepthProcessor> depthProcessor;
+class DepthProcessorWrapper : public DepthProcessor, public PCDSource {
+public:
+
+    DepthProcessorWrapper(const DirectX::XMMATRIX &extrinsics, const float *lut)
+            : DepthProcessor(extrinsics, lut) {}
+
+    bool getNextPCD(timestamp_t &timestamp, PCD &pcd) override {
+        PCDRaw pcdRaw;
+        if (DepthProcessor::getNextPCDRaw(timestamp, pcdRaw)) {
+            assert(pcdRaw.size() % 3 == 0 && "PCDRaw does not contain not flatten 3D vectors");
+            pcd.clear();
+            pcd.reserve(pcdRaw.size() / 3);
+            for (size_t i = 0; i < pcdRaw.size() / 3; i++) {
+                pcd.emplace_back(pcdRaw[i * 3], pcdRaw[i * 3 + 1], pcdRaw[i * 3 + 2]);
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
+};
+
+std::unique_ptr<FileDataSource> fileDataSource;
+
+TCPDataSource tcpStreamingSource;
+
+AHATSource *ahatSource = nullptr;
+InteractionSource *interactionSource = nullptr;
+
+std::unique_ptr<DepthProcessorWrapper> depthProcessor;
 
 bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     // static to hold the latest data
@@ -31,9 +60,9 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     if (!depthProcessor) {
         DirectX::XMMATRIX ahatExtrinsics;
         std::vector<float> ahatLUT;
-        if (!tcpStreamingSource.getAHATExtrinsics(ahatExtrinsics)) return false;
-        if (!tcpStreamingSource.getAHATDepthLUT(ahatLUT)) return false;
-        depthProcessor = std::make_unique<DepthProcessor>(ahatExtrinsics, ahatLUT.data());
+        if (!ahatSource || !ahatSource->getAHATExtrinsics(ahatExtrinsics)) return false;
+        if (!ahatSource || !ahatSource->getAHATDepthLUT(ahatLUT)) return false;
+        depthProcessor = std::make_unique<DepthProcessorWrapper>(ahatExtrinsics, ahatLUT.data());
         std::cout << "Create DepthProcessor with AHAT extrinsics and LUT" << std::endl;
     }
 
@@ -42,24 +71,17 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     timestamp_t ahatTimestamp;
     AHATDepth depth;
     DirectX::XMMATRIX rig2world;
-    if (tcpStreamingSource.getNextAHATFrame(ahatTimestamp, depth, rig2world)) {
+    while (ahatSource && ahatSource->getNextAHATFrame(ahatTimestamp, depth, rig2world)) {
         /*std::cout << "[DEPTH] " << ahatTimestamp << std::endl;*/
         depthProcessor->updateAHAT(ahatTimestamp, depth.data(), rig2world);
-
-        PCDRaw pcdRaw;
-        if (depthProcessor->getNextPCDRaw(pcdTimestamp, pcdRaw)) {
-            assert(pcdRaw.size() % 3 == 0 && "PCDRaw does not contain not flatten 3D vectors");
-            pcd.clear();
-            pcd.reserve(pcdRaw.size() / 3);
-            for(size_t i = 0; i < pcdRaw.size() / 3; i++) {
-                pcd.emplace_back(pcdRaw[i * 3], pcdRaw[i * 3 + 1], pcdRaw[i * 3 + 2]);
-            }
-            /*std::cout << "[PCD] " << pcdTimestamp << std::endl;*/
-            updated = true;
-        }
     }
 
-    if (tcpStreamingSource.getNextInteractionFrame(interationTimestamp, interactionFrame)) {
+    while (depthProcessor->getNextPCD(pcdTimestamp, pcd)) {
+        /*std::cout << "[PCD] " << pcdTimestamp << std::endl;*/
+        updated = true;
+    }
+
+    while (interactionSource && interactionSource->getNextInteractionFrame(interationTimestamp, interactionFrame)) {
         /*std::cout << "[INT] " << interationTimestamp
                   << " Left Hand Tracked: " << interactionFrame.hands[Left].tracked
                   << " Right Hand Tracked: " << interactionFrame.hands[Right].tracked
@@ -135,12 +157,20 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 }
 
 int main() {
+
+    ahatSource = static_cast<AHATSource *>(&tcpStreamingSource);
+    interactionSource = static_cast<InteractionSource *>(&tcpStreamingSource);
+
+//    fileDataSource = std::make_unique<FileDataSource>("/Users/liuzikai/Downloads/2022-11-01-201827-AHAT-PV-EYE-Green-Book-Slow");
+//    ahatSource = static_cast<AHATSource *>(fileDataSource.get());
+//    interactionSource = static_cast<InteractionSource *>(fileDataSource.get());
+
     igl::opengl::glfw::Viewer viewer;
     viewer.callback_pre_draw = callBackPerDraw;
     viewer.core().set_rotation_type(igl::opengl::ViewerCore::ROTATION_TYPE_TRACKBALL);
     viewer.data().point_size = 2;
     viewer.core().is_animating = true;
     Eigen::Vector4f color(1, 1, 1, 1);
-    viewer.core().background_color = color * 0.5f;
+    viewer.core().background_color = color * 0.2f;
     viewer.launch();
 }

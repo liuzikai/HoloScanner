@@ -2,11 +2,11 @@
 // Created by Zikai Liu on 11/12/22.
 //
 
-#include "TCPStreamingSource.h"
+#include "TCPDataSource.h"
 #include <iostream>
 #include <ctime>
 
-TCPStreamingSource::TCPStreamingSource() :
+TCPDataSource::TCPDataSource() :
         socketServer(tcpIOContext, PORT, [](auto s) {
             // Setup a server with automatic acceptance
             std::cout << "TerminalSocketServer: disconnected" << std::endl;
@@ -25,25 +25,25 @@ TCPStreamingSource::TCPStreamingSource() :
                               nullptr);
 }
 
-TCPStreamingSource::~TCPStreamingSource() {
+TCPDataSource::~TCPDataSource() {
     if (tcpIOThread) tcpIOThread->join();
 }
 
-bool TCPStreamingSource::getAHATExtrinsics(DirectX::XMMATRIX &extrinsics) {
+bool TCPDataSource::getAHATExtrinsics(DirectX::XMMATRIX &extrinsics) {
     std::lock_guard<std::mutex> lock(ahatStaticDataMutex);
     if (!ahatExtrinsicsValid) return false;
     extrinsics = ahatExtrinsics;
     return true;
 }
 
-bool TCPStreamingSource::getAHATDepthLUT(AHATLUT &lut) {
+bool TCPDataSource::getAHATDepthLUT(AHATLUT &lut) {
     std::lock_guard<std::mutex> lock(ahatStaticDataMutex);
     if (ahatLUT.empty()) return false;
     lut = ahatLUT;
     return true;
 }
 
-bool TCPStreamingSource::getNextAHATFrame(timestamp_t &timestamp, AHATDepth &depth, DirectX::XMMATRIX &rig2world) {
+bool TCPDataSource::getNextAHATFrame(timestamp_t &timestamp, AHATDepth &depth, DirectX::XMMATRIX &rig2world) {
     std::lock_guard<std::mutex> lock(ahatFrameMutex);
     if (ahatFrames.empty()) return false;
     timestamp = ahatFrames.front().timestamp;
@@ -53,7 +53,7 @@ bool TCPStreamingSource::getNextAHATFrame(timestamp_t &timestamp, AHATDepth &dep
     return true;
 }
 
-bool TCPStreamingSource::getNextInteractionFrame(timestamp_t &timestamp, InteractionFrame &frame) {
+bool TCPDataSource::getNextInteractionFrame(timestamp_t &timestamp, InteractionFrame &frame) {
     std::lock_guard<std::mutex> lock(interactionMutex);
     if (interactionFrames.empty()) return false;
     timestamp = interactionFrames.front().first;
@@ -62,7 +62,7 @@ bool TCPStreamingSource::getNextInteractionFrame(timestamp_t &timestamp, Interac
     return true;
 }
 
-bool TCPStreamingSource::getNextPCD(timestamp_t &timestamp, PCD &pcd) {
+bool TCPDataSource::getNextPCD(timestamp_t &timestamp, PCD &pcd) {
     std::lock_guard<std::mutex> lock(pcdMutex);
     if (pcdFrames.empty()) return false;
     timestamp = pcdFrames.front().first;
@@ -71,7 +71,7 @@ bool TCPStreamingSource::getNextPCD(timestamp_t &timestamp, PCD &pcd) {
     return true;
 }
 
-void TCPStreamingSource::handleRecvBytes(std::string_view name, const uint8_t *buf, size_t size) {
+void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, size_t size) {
 
     if (name == "e") {  // AHAT extrinsics
         static constexpr size_t EXPECTED_SIZE = 16 * sizeof(float);

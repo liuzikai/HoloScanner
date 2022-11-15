@@ -20,14 +20,12 @@ public:
 
 private:
 
-    struct DepthCamRoi {
-        float kRowLower = 0.2;
-        float kRowUpper = 0.55;
-        float kColLower = 0.3;
-        float kColUpper = 0.7;
-        uint16_t depthNearClip = 200; // Unit: mm
-        uint16_t depthFarClip = 800;
-    } depthCamROI;
+    static constexpr size_t ROI_ROW_LOWER = (size_t) (0.2 * AHAT_HEIGHT);
+    static constexpr size_t ROI_ROW_UPPER = (size_t) (0.55 * AHAT_HEIGHT);
+    static constexpr size_t ROI_COL_LOWER = (size_t) (0.3 * AHAT_WIDTH);
+    static constexpr size_t ROI_COL_UPPER = (size_t) (0.7 * AHAT_WIDTH);
+    static constexpr uint16_t DEPTH_NEAR_CLIP = 200; // Unit: mm
+    static constexpr uint16_t DEPTH_FAR_CLIP = 800;
 
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;
     std::mutex pcdMutex;

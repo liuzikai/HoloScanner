@@ -15,10 +15,10 @@
 
 #include <iostream>
 
-#include "TCPStreamingSource.h"
+#include "TCPDataSource.h"
 #include "Adapters.h"
 
-TCPStreamingSource tcpStreamingSource;
+TCPDataSource tcpStreamingSource;
 
 bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     static timestamp_t pcdTimestamp;
@@ -118,4 +118,5 @@ int main() {
     Eigen::Vector4f color(1, 1, 1, 1);
     viewer.core().background_color = color * 0.5f;
     viewer.launch();
+    std::cout << "?";
 }

@@ -32,19 +32,17 @@ void DepthProcessor::updateAHAT(const timestamp_t &timestamp, const uint16_t *de
                                 const DirectX::XMMATRIX &rig2world) {
     std::pair<timestamp_t, PCDRaw> frame;
     frame.first = timestamp;
+    frame.second.reserve((ROI_ROW_UPPER - ROI_ROW_LOWER) * (ROI_COL_UPPER - ROI_COL_LOWER));
 
     XMMATRIX depthToWorld = depthCameraPoseInvMatrix * rig2world;
 
-    for (size_t i = 0; i < AHAT_HEIGHT; i++) {
-        for (size_t j = 0; j < AHAT_WIDTH; j++) {
+    for (auto i = ROI_ROW_LOWER; i < ROI_ROW_UPPER; i++) {
+        for (auto j = ROI_COL_LOWER; j < ROI_COL_UPPER; j++) {
             auto idx = AHAT_WIDTH * i + j;
             uint16_t depth = depthFrame[idx];
             depth = (depth > 4090) ? 0 : depth;
 
-            // back-project point cloud within Roi
-            if ((float) i > depthCamROI.kRowLower * AHAT_HEIGHT && (float) i < depthCamROI.kRowUpper * AHAT_HEIGHT &&
-                (float) j > depthCamROI.kColLower * AHAT_WIDTH && (float) j < depthCamROI.kColUpper * AHAT_WIDTH &&
-                depth > depthCamROI.depthNearClip && depth < depthCamROI.depthFarClip) {
+            if (depth > DEPTH_NEAR_CLIP && depth < DEPTH_FAR_CLIP) {
 
                 // optimize with LUT
                 auto tempPoint = (float) depth / 1000 * lut[idx];
@@ -52,9 +50,11 @@ void DepthProcessor::updateAHAT(const timestamp_t &timestamp, const uint16_t *de
                 // apply transformation
                 auto pointInWorld = XMVector3Transform(tempPoint, depthToWorld);
 
-                frame.second.push_back(XMVectorGetX(pointInWorld));
-                frame.second.push_back(XMVectorGetY(pointInWorld));
-                frame.second.push_back(-XMVectorGetZ(pointInWorld));
+                XMFLOAT3 f;
+                XMStoreFloat3(&f, pointInWorld);
+                frame.second.push_back(f.x);
+                frame.second.push_back(f.y);
+                frame.second.push_back(-f.z);
             }
         }
     }

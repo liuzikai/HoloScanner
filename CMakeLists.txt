@@ -7,7 +7,7 @@ include_directories(HL2UnityPlugin)
 include_directories(CPP)
 
 # Find Boost
-find_package(Boost REQUIRED COMPONENTS system filesystem)
+find_package(Boost REQUIRED COMPONENTS system)
 string(REPLACE ";" ", " Boost_LIBRARIES_STRING "${Boost_LIBRARIES}")
 message("Boost ${Boost_VERSION} found: ${Boost_LIBRARIES_STRING}")
 
@@ -23,20 +23,21 @@ message("LIBIGL_INCLUDE_DIR: ${LIBIGL_INCLUDE_DIR}")
 
 add_executable(PCD
         CPP/TerminalSocket.cpp
-        CPP/TCPStreamingSource.cpp
+        CPP/TCPDataSource.cpp
         CPP/Pipelines/PCD.cpp
         )
 target_link_libraries(PCD
-        ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY}
+        ${Boost_SYSTEM_LIBRARY}
         DirectXMath
         igl::core igl::glfw igl::imgui)
 
 add_executable(DepthToPCD
         CPP/TerminalSocket.cpp
-        CPP/TCPStreamingSource.cpp
+        CPP/TCPDataSource.cpp
+        CPP/FileDataSource.cpp
         CPP/DepthProcessor.cpp
         CPP/Pipelines/DepthToPCD.cpp)
 target_link_libraries(DepthToPCD
-        ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY}
+        ${Boost_SYSTEM_LIBRARY}
         DirectXMath
         igl::core igl::glfw igl::imgui)
