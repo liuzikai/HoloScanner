@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.16)
 project(HoloScanner)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -13,6 +13,9 @@ message("Boost ${Boost_VERSION} found: ${Boost_LIBRARIES_STRING}")
 
 # DirectXMath
 add_subdirectory(CPP/DirectXMath)
+
+# Open3D
+find_package(Open3D REQUIRED)
 
 # libigl
 option(LIBIGL_OPENGL "Use OpenGL" ON)
@@ -36,8 +39,12 @@ add_executable(DepthToPCD
         CPP/TCPDataSource.cpp
         CPP/FileDataSource.cpp
         CPP/DepthProcessor.cpp
-        CPP/Pipelines/DepthToPCD.cpp)
+        CPP/Pipelines/DepthToPCD.cpp
+        CPP/Registrator.cpp
+        )
 target_link_libraries(DepthToPCD
         ${Boost_SYSTEM_LIBRARY}
         DirectXMath
-        igl::core igl::glfw igl::imgui)
+        igl::core igl::glfw igl::imgui
+        Open3D::Open3D
+        )

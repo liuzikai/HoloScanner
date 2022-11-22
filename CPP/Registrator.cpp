@@ -3,7 +3,7 @@
 //
 
 #include "open3d/Open3D.h"
-#include "registrator.h"
+#include "Registrator.h"
 #include <memory>
 
 using namespace open3d;
