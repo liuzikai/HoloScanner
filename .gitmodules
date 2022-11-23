@@ -1,6 +1,6 @@
 [submodule "CPP/DirectXMath"]
 	path = CPP/DirectXMath
-	url = git@github.com:liuzikai/DirectXMath.git
+	url = https://github.com/liuzikai/HoloScanner.git
 [submodule "CPP/libigl"]
 	path = CPP/libigl
 	url = https://github.com/libigl/libigl.git
