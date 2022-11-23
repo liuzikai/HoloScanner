@@ -22,6 +22,9 @@ public:
 
 private:
     int countTrackedJoints(const Hand& hand);
+    //bool createHandMesh(const InteractionFrame &hand, bool &lhTracked, bool &rhTracked);
+    bool createHandMesh(const Hand& hand, std::vector<DirectX::XMVECTOR> &mesh, std::vector<float> &distances);
+
     static constexpr size_t ROI_ROW_LOWER = (size_t) (0.2 * AHAT_HEIGHT);
     static constexpr size_t ROI_ROW_UPPER = (size_t) (0.55 * AHAT_HEIGHT);
     static constexpr size_t ROI_COL_LOWER = (size_t) (0.3 * AHAT_WIDTH);
@@ -37,8 +40,8 @@ private:
     constexpr size_t clippedDepthFrameHeight = roiRowUpper - roiRowLower;
 
     size_t stdLogIndex = 0;
-    constexpr size_t stdLogSize = 10;
-    constexpr float maxStdVal = 0.01*0.01; // squared value on purpose
+    static constexpr size_t STD_LOG_SIZE = 10;
+    static constexpr float MAX_STD_VAL = 0.01*0.01; // squared value on purpose
     std::vector<float> stdVal;
     std::vector<float> depthMovingAverage;
     std::vector<std::vector<float>> stdDepthVec;
@@ -47,8 +50,18 @@ private:
 
     DirectX::XMMATRIX extrinsics;
     DirectX::XMMATRIX depthCameraPoseInvMatrix;
+    std::vector<DirectX::XMVECTOR> lhMesh;
+    std::vector<float> lhDistances;
+    std::vector<DirectX::XMVECTOR> rhMesh;
+    std::vector<float> rhDistances;
 
     std::vector<DirectX::XMVECTOR> lut;
+
+    std::vector<std::vector<int>> handBones; // Left;
+    //std::vector<std::vector<int>> handBonesRight;
+    std::vector<float> fingerSizes;
+    static constexpr float WRIST_RADIUS = 0.05;
+    static constexpr float FINGER_RADIUS = 0.025;
 };
 
 
