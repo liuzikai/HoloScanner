@@ -16,7 +16,7 @@
 #include <iostream>
 
 #include "TCPDataSource.h"
-#include "Adapters.h"
+#include "EigenHelpers.h"
 
 TCPDataSource tcpStreamingSource;
 

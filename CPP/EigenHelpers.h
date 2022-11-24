@@ -7,10 +7,6 @@
 #include <Eigen/Eigen>
 #include <DirectXMath.h>
 
-static inline DirectX::XMVECTOR XMTransformToTranslate(const DirectX::XMMATRIX &m) {
-    return m.r[3];  // see XMMatrixDecompose
-}
-
 static inline Eigen::Vector3d XMVectorToEigenVector3d(const DirectX::XMVECTOR &v) {
     DirectX::XMFLOAT3 f;
     DirectX::XMStoreFloat3(&f, v);

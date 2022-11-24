@@ -13,9 +13,12 @@
 
 #include <iostream>
 
+#ifdef BOOST_AVAILABLE
 #include "TCPDataSource.h"
+#endif
 #include "DepthProcessor.h"
-#include "Adapters.h"
+#include "DirectXHelpers.h"
+#include "EigenHelpers.h"
 #include "FileDataSource.h"
 
 class DepthProcessorWrapper : public DepthProcessor, public PCDSource {
@@ -39,10 +42,6 @@ public:
         }
     }
 };
-
-std::unique_ptr<FileDataSource> fileDataSource;
-
-TCPDataSource tcpStreamingSource;
 
 bool discardDelayedFrames = false;
 
@@ -214,12 +213,17 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 int main() {
     std::ios::sync_with_stdio(false);
 
+#ifdef BOOST_AVAILABLE
+    TCPDataSource tcpStreamingSource;
     discardDelayedFrames = true;
     ahatSource = static_cast<AHATSource *>(&tcpStreamingSource);
     interactionSource = static_cast<InteractionSource *>(&tcpStreamingSource);
+#else
+#error "Boost not available"
+#endif
 
 //    discardDelayedFrames = false;
-//    fileDataSource = std::make_unique<FileDataSource>("/Users/liuzikai/Downloads/2022-11-01-201827-AHAT-PV-EYE-Green-Book-Slow");
+//    std::unique_ptr<FileDataSource> fileDataSource = std::make_unique<FileDataSource>("/Users/liuzikai/Files/MR-Local/2022-11-01-201827-AHAT-PV-EYE-Green-Book-Slow");
 //    ahatSource = static_cast<AHATSource *>(fileDataSource.get());
 //    interactionSource = static_cast<InteractionSource *>(fileDataSource.get());
 
