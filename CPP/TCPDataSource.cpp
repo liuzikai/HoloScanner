@@ -147,8 +147,9 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
                     joint.transformationInWorld = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
                     fbuf += 16;
 
-                    joint.translationInRig = XMVector3Transform(XMTransformToTranslate(joint.transformationInWorld),
+                    joint.translationInRig = DirectX::XMVector3Transform(XMTransformToTranslate(joint.transformationInWorld),
                                                                 world2rig);
+//                    joint.translationInRig /= DirectX::XMVectorGetW(joint.translationInRig);
                 }
 
                 // Hand tracked + all joints tracked

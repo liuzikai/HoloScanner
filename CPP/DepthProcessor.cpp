@@ -42,11 +42,11 @@ bool DepthProcessor::getNextPCDRaw(timestamp_t &timestamp, PCDRaw &pcdRaw) {
 }
 
 bool DepthProcessor::updateHandMesh(const Hand &hand, std::vector<DirectX::XMVECTOR> &mesh,
-                                    std::vector<float> &filterDistances) {
+                                    std::vector<float> &filterDistanceSq) {
     if (!hand.strictlyTracked) return false;
 
     mesh.clear();
-    filterDistances.clear();
+    filterDistanceSq.clear();
 
     for (const auto &b: HAND_BONES) {
         const float d1 = FINGER_SIZES[b[0]];
@@ -69,15 +69,24 @@ bool DepthProcessor::updateHandMesh(const Hand &hand, std::vector<DirectX::XMVEC
 
         float delta = boneLength / segmentCount;
         int sCount = static_cast<int>(segmentCount);
-        for (int s = 0; s < sCount; ++s) {
+        for (int s = 0; s <= sCount; ++s) {
             float x = (float) s * delta;
             mesh.push_back(origin + x * boneDirection);
             float percent = 1.0f / boneLength * x;
-            filterDistances.push_back(d1 * (1.0f - percent) + d2 * percent);
+            filterDistanceSq.push_back(pow2(d1 * (1.0f - percent) + d2 * percent));
         }
     }
 
     return true;
+}
+
+bool DepthProcessor::inHandMesh(const XMVECTOR &point) {
+    for (int h = 0; h < HandIndexCount; h++) {
+        for (int i = 0; i < handMesh[h].size(); i++) {
+            float distSq = XMVectorGetX(XMVector3LengthSq(point - handMesh[h][i]));
+            if (distSq < handFilterDistanceSq[h][i]) return true;}
+    }
+    return false;
 }
 
 bool DepthProcessor::update(const RawDataFrame &input) {
@@ -85,13 +94,13 @@ bool DepthProcessor::update(const RawDataFrame &input) {
         return false;  // tell the user of dropping frame
     }
 
-    updateHandMesh(input.hands[Left], handMesh[Left], handFilterDistances[Left]);
-    updateHandMesh(input.hands[Right], handMesh[Right], handFilterDistances[Right]);
+    updateHandMesh(input.hands[Left], handMesh[Left], handFilterDistanceSq[Left]);
+    updateHandMesh(input.hands[Right], handMesh[Right], handFilterDistanceSq[Right]);
 
     std::pair<timestamp_t, PCDRaw> frame;
     frame.first = input.timestamp;
     frame.second.reserve(CLIPPED_DEPTH_FRAME_WIDTH * CLIPPED_DEPTH_FRAME_HEIGHT);
-    
+
     auto lwTranf = input.hands[HandIndex::Left].joints[HandJointIndex::Wrist].translationInRig;
     auto rwTransf = input.hands[HandIndex::Right].joints[HandJointIndex::Wrist].translationInRig;
     auto midpoint = (lwTranf + rwTransf) * 0.5f;
@@ -117,7 +126,7 @@ bool DepthProcessor::update(const RawDataFrame &input) {
         }
     }
     stdLogIndex = nextInd;
-    
+
     for (auto r = 0; r < CLIPPED_DEPTH_FRAME_HEIGHT; ++r) {
         for (auto c = 0; c < CLIPPED_DEPTH_FRAME_WIDTH; ++c) {
             size_t ind = r * CLIPPED_DEPTH_FRAME_WIDTH + c;
@@ -137,15 +146,21 @@ bool DepthProcessor::update(const RawDataFrame &input) {
             }
 #endif
 
+            // Filter on std deviation and depth clipping
             if (dev < MAX_STD_VAL && depth > depthNearClip && depth < depthFarClip) {
                 auto pointInCam = ((float) depth / 1000.0f) * lut[ind];
                 auto pointInRig = XMVector3Transform(pointInCam, cam2rig);
+                pointInRig /= XMVectorGetW(pointInRig);
 
-                XMFLOAT4 f;
-                XMStoreFloat4(&f, pointInRig);
-                frame.second.push_back(f.x / f.w);
-                frame.second.push_back(f.y / f.w);
-                frame.second.push_back(-f.z / f.w);
+                // Filter by hand mesh
+                bool inMesh = inHandMesh(pointInRig);
+                if (!inMesh) {
+                    XMFLOAT3 f;
+                    XMStoreFloat3(&f, pointInRig);
+                    frame.second.push_back(f.x);
+                    frame.second.push_back(f.y);
+                    frame.second.push_back(-f.z);
+                }
             }
         }
     }

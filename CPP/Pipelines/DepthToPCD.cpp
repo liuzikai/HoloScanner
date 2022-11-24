@@ -54,6 +54,8 @@ std::unique_ptr<DepthProcessorWrapper> depthProcessor;
 
 static const Eigen::RowVector3d HAND_COLOR[HandIndexCount] = {Eigen::RowVector3d(0, 1, 0),
                                                               Eigen::RowVector3d(1, 0, 0)};
+static const Eigen::RowVector3d HAND_MESH_COLOR[HandIndexCount] = {Eigen::RowVector3d(0, 1, 1),
+                                                                   Eigen::RowVector3d(1, 0, 1)};
 Eigen::MatrixXd BOTH_HANDS_EDGE_COLORS(48, 3);
 
 bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
@@ -78,34 +80,29 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     if (rawDataSource) {
         do {
             if (!rawDataSource->getNextRawDataFrame(rawDataFrame)) break;
-
-            bool newLostTracking = !depthProcessor->update(rawDataFrame);
-            if (newLostTracking != lostTracking) {
-                redraw = true;
-            }
-            lostTracking = newLostTracking;
-
 #if 0
             std::cout << "[Raw] " << rawDataFrame.timestamp << "    lostTracking = " << lostTracking << std::endl;
 #endif
-
         } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
+
+        bool newLostTracking = !depthProcessor->update(rawDataFrame);
+        if (newLostTracking != lostTracking) {
+            redraw = true;
+        }
+        lostTracking = newLostTracking;
     }
 
     if (depthProcessor) {
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
 
-#if 0
-            std::cout << "[PCD] " << pcdTimestamp << std::endl;
+#if 1
+            std::cout << "[PCD] " << pcd.size() << std::endl;
 #endif
             redraw = true;
 
         } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
     }
-
-    bool leftTracked = rawDataFrame.hands[Left].strictlyTracked;
-    bool rightTracked = rawDataFrame.hands[Right].strictlyTracked;
 
     if (redraw) {
         viewer.data().clear();
@@ -120,8 +117,8 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                                      lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
 
             // Set camera on first frame
-            static int warm_up_frame = 20;
-            if (warm_up_frame > 0) {
+            static int warm_up_frame = 5;
+            if (warm_up_frame > 0 && pcd.size() > 200) {
                 warm_up_frame--;
                 if (warm_up_frame == 0) {
                     viewer.core().align_camera_center(points);
@@ -137,12 +134,15 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                 for (int i = 0; i < meshPoints.size(); i++) {
                     points.row(i) = XMVectorToEigenVector3d(meshPoints[i]);
                 }
-                viewer.data().add_points(points, HAND_COLOR[h]);
+                viewer.data().add_points(points, HAND_MESH_COLOR[h]);
             }
         }
 
         // Hand edges
-#if 0
+#if 1
+        bool leftTracked = rawDataFrame.hands[Left].strictlyTracked;
+        bool rightTracked = rawDataFrame.hands[Right].strictlyTracked;
+
         if (!lostTracking)
         {
             if (leftTracked && rightTracked) {

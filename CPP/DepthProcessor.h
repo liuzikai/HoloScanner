@@ -37,7 +37,7 @@ public:
     size_t stdLogIndex = 0;
     static constexpr size_t STD_LOG_SIZE = 10;
 
-    static constexpr float MAX_STD_VAL = 14000.0f; // squared value on purpose
+    static constexpr float MAX_STD_VAL = 15000.0f; // squared value on purpose
 
 
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;
@@ -49,7 +49,7 @@ public:
     std::vector<DirectX::XMVECTOR> lut;
 
     std::vector<DirectX::XMVECTOR> handMesh[HandIndexCount];
-    std::vector<float> handFilterDistances[HandIndexCount];
+    std::vector<float> handFilterDistanceSq[HandIndexCount];  // squared distances
 
     // @formatter:off
     static constexpr int HAND_BONES[][2] = {
@@ -72,7 +72,9 @@ public:
     static_assert(sizeof(DepthProcessor::FINGER_SIZES) == HandJointIndexCount * sizeof(float), "FINGER_SIZES");
 
 
-    bool updateHandMesh(const Hand &hand, std::vector<DirectX::XMVECTOR> &mesh, std::vector<float> &filterDistances);
+    bool updateHandMesh(const Hand &hand, std::vector<DirectX::XMVECTOR> &mesh, std::vector<float> &filterDistanceSq);
+
+    bool inHandMesh(const DirectX::XMVECTOR &point);
 };
 
 
