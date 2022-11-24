@@ -1778,7 +1778,7 @@ MonoBehaviour:
   text: {fileID: 180299606}
   pointCloudRendererGo: {fileID: 168399716}
   pointColor: {r: 1, g: 1, b: 1, a: 1}
-  AHATStreamingLED: {fileID: 1420433853}
+  RawDataStreamingLED: {fileID: 1420433853}
   InteractionStreamingLED: {fileID: 1793785202}
   PointCloudStreamingLED: {fileID: 1671906092}
 --- !u!4 &891080481
@@ -3305,7 +3305,7 @@ GameObject:
   - component: {fileID: 1420433854}
   - component: {fileID: 1420433853}
   m_Layer: 0
-  m_Name: AHATStreamingLED
+  m_Name: RawDataStreamingLED
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4750,7 +4750,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 891080480}
-        m_MethodName: ToggleAHATStreamingEvent
+        m_MethodName: ToggleRawDataStreamingEvent
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

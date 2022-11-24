@@ -67,8 +67,8 @@ public class ResearchModeVideoStream : MonoBehaviour
 
     private bool AHATLUTSent = false;
 
-    public Renderer AHATStreamingLED;
-    public bool AHATStreaming { get; private set; } = false;
+    public Renderer RawDataStreamingLED;
+    public bool RawDataStreaming { get; private set; } = false;
 
     public Renderer InteractionStreamingLED;
     public bool InteractionStreaming { get; private set; } = false;
@@ -78,7 +78,7 @@ public class ResearchModeVideoStream : MonoBehaviour
 
     private void Awake()
     {
-        if (AHATStreamingLED) AHATStreamingLED.material.color = Color.red;
+        if (RawDataStreamingLED) RawDataStreamingLED.material.color = Color.red;
         if (InteractionStreamingLED) InteractionStreamingLED.material.color = Color.red;
         if (PointCloudStreamingLED) PointCloudStreamingLED.material.color = Color.red;
 #if ENABLE_WINMD_SUPPORT
@@ -241,27 +241,27 @@ public class ResearchModeVideoStream : MonoBehaviour
 
         if (ahatUpdated) 
         {
-            if (AHATStreaming)
+            if (RawDataStreaming)
             {
                 if (!AHATLUTSent) 
                 {
                     if (SendAHATLUTData())
                     {
                         AHATLUTSent = true;
-                        AHATStreamingLED.material.color = Color.green;
+                        RawDataStreamingLED.material.color = Color.green;
                     }
                 }
 
                 if (AHATLUTSent)
                 {
-                    SendAHATDepthData();
-                }
-            }
+                    var timestamp = researchMode.GetDepthUpdateTimestamp();
 
-            // Measurements shows that the following call only takes 1-2ms
-            interactions.Update(researchMode.GetDepthUpdateTimestamp());
-            if (InteractionStreaming) {
-                SendInteractionData();
+                    // Measurements shows that the this call only takes 1-2ms
+                    interactions.Update(timestamp);
+
+                    // TODO: timestamp and actual data may out-of-sync, but ignore for now
+                    SendRawData(timestamp.TargetTime.ToUnixTimeMilliseconds());
+                }
             }
         }
 
@@ -431,14 +431,14 @@ public class ResearchModeVideoStream : MonoBehaviour
         startRealtimePreview = false;
     }
 
-    public void ToggleAHATStreamingEvent() {
-        if (!AHATStreaming) 
+    public void ToggleRawDataStreamingEvent() {
+        if (!RawDataStreaming) 
         {
             if (tcpClient.Connected) 
             {
-                AHATStreaming = true;
+                RawDataStreaming = true;
                 AHATLUTSent = false;
-                AHATStreamingLED.material.color = Color.yellow;
+                RawDataStreamingLED.material.color = Color.yellow;
 
 #if ENABLE_WINMD_SUPPORT
                 var data = new List<float>();
@@ -449,8 +449,8 @@ public class ResearchModeVideoStream : MonoBehaviour
             
         } else 
         {
-            AHATStreaming = false;
-            AHATStreamingLED.material.color = Color.red;
+            RawDataStreaming = false;
+            RawDataStreamingLED.material.color = Color.red;
         }
     }
 
@@ -529,23 +529,26 @@ public class ResearchModeVideoStream : MonoBehaviour
         return false;
     }
 
-    public void SendAHATDepthData()
+    public void SendRawData(long timestamp)
     {
 #if ENABLE_WINMD_SUPPORT
-        var depthMap = researchMode.GetDepthMapBuffer();
-        var rigToWorld = researchMode.GetRigToWorld();
 #if WINDOWS_UWP
         if (tcpClient != null)
         {
+            var depthMap = researchMode.GetDepthMapBuffer();
+            
+            // Serialize rigToWorld
+            var rigToWorld = researchMode.GetRigToWorld();
             var rigToWorldData = new List<float>();
             SerializeMatrix4x4(rigToWorldData, rigToWorld);
-            tcpClient.SendUINT16AndFloatAsync("d", depthMap, rigToWorldData.ToArray());
+
+            tcpClient.SendRawDataAsync("R", timestamp, depthMap, rigToWorldData.ToArray(), SerializeInteractionData());
         }
 #endif
 #endif
     }
 
-    public void SendInteractionData()
+    public float[] SerializeInteractionData()
     {
 #if ENABLE_WINMD_SUPPORT
         List<float> data = new List<float>();
@@ -571,12 +574,7 @@ public class ResearchModeVideoStream : MonoBehaviour
         SerializeVector4(data, interactions.GetEyeGazeOrigin());
         SerializeVector4(data, interactions.GetEyeGazeDirection());
 
-#if WINDOWS_UWP
-        if (tcpClient != null)
-        {
-            tcpClient.SendFloatAsync("i", data.ToArray());
-        }
-#endif
+        return data.ToArray();
 #endif
     }
 

@@ -131,7 +131,7 @@ public class TCPClient : MonoBehaviour
 
     private void StopConnection()
     {
-        if (videoStream.AHATStreaming) videoStream.ToggleAHATStreamingEvent();
+        if (videoStream.RawDataStreaming) videoStream.ToggleRawDataStreamingEvent();
         if (videoStream.InteractionStreaming) videoStream.ToggleInteractionStreamingEvent();
         if (videoStream.PointCloudStreaming) videoStream.TogglePointCloudStreamingEvent();
 
@@ -182,7 +182,7 @@ public class TCPClient : MonoBehaviour
         PendingMessageCount--;
     }
 
-    public async void SendUINT16AndFloatAsync(string header, ushort[] uint16Data, float[] floatData, bool canDrop = true)
+    public async void SendRawDataAsync(string header, long timestamp, ushort[] ahatDepth, float[] rigToWorld, float[] interaction, bool canDrop = true)
     {
         if (canDrop && PendingMessageCount >= MaxPendingMessageCount) return;
 
@@ -196,11 +196,13 @@ public class TCPClient : MonoBehaviour
             dw.WriteByte(0);  // NUL-termination
 
             // Write length in bytes
-            dw.WriteInt32(uint16Data.Length * sizeof(ushort) + floatData.Length * sizeof(float));
+            dw.WriteInt32(sizeof(long) + ahatDepth.Length * sizeof(ushort) + rigToWorld.Length * sizeof(float) + interaction.length * sizeof(float));
 
             // Write actual data
-            dw.WriteBytes(UINT16ToBytes(uint16Data));
-            dw.WriteBytes(FloatToBytes(floatData));
+            dw.WriteInt64(timestamp);
+            dw.WriteBytes(UINT16ToBytes(ahatDepth));
+            dw.WriteBytes(FloatToBytes(rigToWorld));
+            dw.WriteBytes(FloatToBytes(interaction));
 
             // Send out
             await dw.StoreAsync();
