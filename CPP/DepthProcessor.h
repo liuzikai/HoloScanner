@@ -19,8 +19,7 @@ public:
 
     bool getNextPCDRaw(timestamp_t &timestamp, PCDRaw &pcdRaw);
 
-private:
-    static int countTrackedJoints(const Hand& hand);
+public:
 
     static constexpr size_t ROI_ROW_LOWER = 256 - 168;
     static constexpr size_t ROI_ROW_UPPER = 256 + 80;
@@ -28,6 +27,7 @@ private:
     static constexpr size_t ROI_COL_UPPER = 256 + 128;
     static constexpr uint16_t DEPTH_NEAR_CLIP = 200;  // Unit: mm
     static constexpr uint16_t DEPTH_FAR_CLIP = 800;
+    static constexpr uint16_t DEPTH_FILTER_OFFSET = 200;
 
     static constexpr size_t CLIPPED_DEPTH_FRAME_WIDTH = ROI_COL_UPPER - ROI_COL_LOWER;
     static constexpr size_t CLIPPED_DEPTH_FRAME_HEIGHT = ROI_ROW_UPPER - ROI_ROW_LOWER;
@@ -37,7 +37,6 @@ private:
     size_t stdLogIndex = 0;
     static constexpr size_t STD_LOG_SIZE = 10;
 
-    std::vector<float> stdVal;
     static constexpr float MAX_STD_VAL = 14000.0f; // squared value on purpose
 
 
@@ -46,24 +45,34 @@ private:
 
     DirectX::XMMATRIX extrinsics;
     DirectX::XMMATRIX cam2rig;
-    std::vector<DirectX::XMVECTOR> lhMesh;
-    std::vector<float> lhDistances;
-    std::vector<DirectX::XMVECTOR> rhMesh;
-    std::vector<float> rhDistances;
 
     std::vector<DirectX::XMVECTOR> lut;
 
-    const std::vector<std::vector<int>> handBones = {
-            /* Thumb  */ {1, 2 }, /**/ {2, 3  }, /**/ {3, 4  }, /**/ {4, 5  },
-            /* Index  */ {1, 6 }, /**/ {6, 7  }, /**/ {7, 8  }, /**/ {8, 9  }, /**/ {9, 10 },
-            /* Middle */ {1, 11}, /**/ {11, 12}, /**/ {12, 13}, /**/ {13, 14}, /**/ {14, 15},
-            /* Ring   */ {1, 16}, /**/ {16, 17}, /**/ {17, 18}, /**/ {18, 19}, /**/ {19, 20},
-            /* Pinky  */ {1, 21}, /**/ {21, 22}, /**/ {22, 23}, /**/ {23, 24}, /**/ {24, 25}
+    std::vector<DirectX::XMVECTOR> handMesh[HandIndexCount];
+    std::vector<float> handFilterDistances[HandIndexCount];
+
+    // @formatter:off
+    static constexpr int HAND_BONES[][2] = {
+        /* Thumb  */ {1, 2 }, /**/ {2, 3  }, /**/ {3, 4  }, /**/ {4, 5  },
+        /* Index  */ {1, 6 }, /**/ {6, 7  }, /**/ {7, 8  }, /**/ {8, 9  }, /**/ {9, 10 },
+        /* Middle */ {1, 11}, /**/ {11, 12}, /**/ {12, 13}, /**/ {13, 14}, /**/ {14, 15},
+        /* Ring   */ {1, 16}, /**/ {16, 17}, /**/ {17, 18}, /**/ {18, 19}, /**/ {19, 20},
+        /* Pinky  */ {1, 21}, /**/ {21, 22}, /**/ {22, 23}, /**/ {23, 24}, /**/ {24, 25}
     };
-    //std::vector<std::vector<int>> handBonesRight;
-    std::vector<float> fingerSizes;
-    static constexpr float WRIST_RADIUS = 0.05;
-    static constexpr float FINGER_RADIUS = 0.025;
+    // @formatter:on
+
+    static constexpr float WRIST_RADIUS = 0.05f;
+    static constexpr float FINGER_RADIUS = 0.025f;
+    static constexpr float FINGER_SIZES[HandJointIndexCount] = {
+            WRIST_RADIUS, WRIST_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS,
+            FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS,
+            FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS,
+            FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS,
+    };
+    static_assert(sizeof(DepthProcessor::FINGER_SIZES) == HandJointIndexCount * sizeof(float), "FINGER_SIZES");
+
+
+    bool updateHandMesh(const Hand &hand, std::vector<DirectX::XMVECTOR> &mesh, std::vector<float> &filterDistances);
 };
 
 

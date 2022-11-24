@@ -10,7 +10,8 @@ static inline DirectX::XMVECTOR XMTransformToTranslate(const DirectX::XMMATRIX &
     return m.r[3];  // see XMMatrixDecompose
 }
 
-static inline DirectX::XMVECTOR XMVectorMidpoint(const DirectX::XMVECTOR &a, const DirectX::XMVECTOR &b) {
-    static const DirectX::XMVECTOR HALF = DirectX::XMVectorSet(0.5f, 0.5f, 0.5f, 0.5f);
-    return DirectX::XMVectorMultiply(DirectX::XMVectorAdd(a, b), HALF);
+static inline float XMVectorSquaredNorm(const DirectX::XMVECTOR &v) {
+    DirectX::XMFLOAT3 f;
+    DirectX::XMStoreFloat3(&f, v);
+    return f.x * f.x + f.y * f.y + f.z * f.z;
 }

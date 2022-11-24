@@ -56,6 +56,7 @@ enum HandJointIndex {
 
 struct Hand {
     bool tracked;
+    bool strictlyTracked;  // hand tracked and all joints tracked
     HandJoint joints[HandJointIndexCount];
 };
 
@@ -104,6 +105,16 @@ public:
      * @return true if there are new frame available, otherwise the output variables are not touched
      */
     virtual bool getNextRawDataFrame(RawDataFrame& frame) = 0;
+
+protected:
+
+    static int countTrackedJoints(const Hand &hand) {
+        int result = 0;
+        for (const auto &joint: hand.joints) {
+            if (joint.tracked) result++;
+        }
+        return result;
+    }
 };
 
 using PCDRaw = std::vector<float>;

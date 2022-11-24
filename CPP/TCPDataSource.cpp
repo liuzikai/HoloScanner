@@ -150,6 +150,9 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
                     joint.translationInRig = XMVector3Transform(XMTransformToTranslate(joint.transformationInWorld),
                                                                 world2rig);
                 }
+
+                // Hand tracked + all joints tracked
+                hand.strictlyTracked = hand.tracked && countTrackedJoints(hand) == HandJointIndexCount;
             }
 
             // Eye

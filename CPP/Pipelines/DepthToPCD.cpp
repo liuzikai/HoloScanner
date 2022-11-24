@@ -14,8 +14,11 @@
 #include <iostream>
 
 #ifdef BOOST_AVAILABLE
+
 #include "TCPDataSource.h"
+
 #endif
+
 #include "DepthProcessor.h"
 #include "DirectXHelpers.h"
 #include "EigenHelpers.h"
@@ -48,14 +51,6 @@ bool discardDelayedFrames = false;
 RawDataSource *rawDataSource = nullptr;
 
 std::unique_ptr<DepthProcessorWrapper> depthProcessor;
-
-int countTrackedJoints(const Hand &hand) {
-    int result = 0;
-    for (const auto &joint: hand.joints) {
-        if (joint.tracked) result++;
-    }
-    return result;
-}
 
 static const Eigen::RowVector3d HAND_COLOR[HandIndexCount] = {Eigen::RowVector3d(0, 1, 0),
                                                               Eigen::RowVector3d(1, 0, 0)};
@@ -109,23 +104,46 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
     }
 
-    // FIXME: duplicated code
-    bool leftTracked = rawDataFrame.hands[Left].tracked && countTrackedJoints(rawDataFrame.hands[Left]);
-    bool rightTracked = rawDataFrame.hands[Right].tracked && countTrackedJoints(rawDataFrame.hands[Right]);
+    bool leftTracked = rawDataFrame.hands[Left].strictlyTracked;
+    bool rightTracked = rawDataFrame.hands[Right].strictlyTracked;
 
     if (redraw) {
         viewer.data().clear();
 
         // PCD
-        Eigen::MatrixXd points(pcd.size(), 3);
-        for (int i = 0; i < pcd.size(); i++) {
-            points.row(i) = pcd[i].cast<double>();
-        }
-        viewer.data().add_points(points,
-                                 lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
+        {
+            Eigen::MatrixXd points(pcd.size(), 3);
+            for (int i = 0; i < pcd.size(); i++) {
+                points.row(i) = pcd[i].cast<double>();
+            }
+            viewer.data().add_points(points,
+                                     lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
 
-        // Interaction
-//        if (!lostTracking)
+            // Set camera on first frame
+            static int warm_up_frame = 20;
+            if (warm_up_frame > 0) {
+                warm_up_frame--;
+                if (warm_up_frame == 0) {
+                    viewer.core().align_camera_center(points);
+                }
+            }
+        }
+
+        // Hand meshes
+        {
+            for (int h = 0; h < HandIndexCount; h++) {
+                const auto &meshPoints = depthProcessor->handMesh[h];
+                Eigen::MatrixXd points(meshPoints.size(), 3);
+                for (int i = 0; i < meshPoints.size(); i++) {
+                    points.row(i) = XMVectorToEigenVector3d(meshPoints[i]);
+                }
+                viewer.data().add_points(points, HAND_COLOR[h]);
+            }
+        }
+
+        // Hand edges
+#if 0
+        if (!lostTracking)
         {
             if (leftTracked && rightTracked) {
                 // Both hands
@@ -175,15 +193,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                 viewer.data().set_edges(jointPoints, EDGES_SINGLE_HAND, HAND_COLOR[i]);
             }
         }
-
-        // Set camera on first frame
-        static int warm_up_frame = 20;
-        if (warm_up_frame > 0) {
-            warm_up_frame--;
-            if (warm_up_frame == 0) {
-                viewer.core().align_camera_center(points);
-            }
-        }
+#endif
     }
 
     return false;

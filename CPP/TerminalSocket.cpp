@@ -256,8 +256,8 @@ void TerminalSocketBase::handleRecv(const boost::system::error_code &error, size
 
 
     if (recvOffset + RECV_BUFFER_SIZE > recvBuf.size()) {
-        std::cerr << "Warning: TerminalSocketBase enlarges its receiver buffer to 2x" << std::endl;
         recvBuf.resize(recvBuf.size() * 2);  // enlarge the buffer to 2x
+        std::cerr << "Warning: TerminalSocketBase enlarges its receiver buffer to 2x (" << recvBuf.size() << " bytes now)" << std::endl;
     }
 
     if (socket != nullptr) {
