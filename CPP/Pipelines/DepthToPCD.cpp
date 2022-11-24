@@ -33,7 +33,8 @@ public:
             pcd.clear();
             pcd.reserve(pcdRaw.size() / 3);
             for (size_t i = 0; i < pcdRaw.size() / 3; i++) {
-                pcd.emplace_back(pcdRaw[i * 3], pcdRaw[i * 3 + 1], pcdRaw[i * 3 + 2]);
+                // NOTICE: swapping x and y and both negated
+                pcd.emplace_back(-pcdRaw[i * 3 + 1], -pcdRaw[i * 3], pcdRaw[i * 3 + 2]);
             }
             return true;
         } else {

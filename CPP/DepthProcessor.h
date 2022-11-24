@@ -38,7 +38,7 @@ private:
     static constexpr size_t STD_LOG_SIZE = 10;
 
     std::vector<float> stdVal;
-    static constexpr float MAX_STD_VAL = 13000.0f; // squared value on purpose
+    static constexpr float MAX_STD_VAL = 14000.0f; // squared value on purpose
 
 
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;

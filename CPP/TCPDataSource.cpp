@@ -125,7 +125,7 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
             frame.rig2world = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
             buf += RIG2WORLD_SIZE;
         }
-        DirectX::XMMATRIX world2rig = DirectX::XMMatrixTranspose(frame.rig2world);
+        DirectX::XMMATRIX world2rig = DirectX::XMMatrixInverse(nullptr, frame.rig2world);
 
         // Interaction
         {
