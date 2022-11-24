@@ -8,48 +8,44 @@
 #include <queue>
 #include <mutex>
 
-#include "DepthDataTypes.h"
-#include "InteractionDataTypes.h"
+#include "RawDataTypes.h"
 
 class DepthProcessor {
 public:
 
     DepthProcessor(const DirectX::XMMATRIX &extrinsics, const float *lut);
 
-    void updateAHAT(const timestamp_t &timestamp, const uint16_t *depth, const DirectX::XMMATRIX &rig2world, const InteractionFrame &hand);
+    bool update(const RawDataFrame &rawDataFrame);
 
     bool getNextPCDRaw(timestamp_t &timestamp, PCDRaw &pcdRaw);
 
 private:
-    int countTrackedJoints(const Hand& hand);
-    //bool createHandMesh(const InteractionFrame &hand, bool &lhTracked, bool &rhTracked);
-    bool createHandMesh(const Hand& hand, std::vector<DirectX::XMVECTOR> &mesh, std::vector<float> &distances);
+    static int countTrackedJoints(const Hand& hand);
 
-    static constexpr size_t ROI_ROW_LOWER = (size_t) (0.2 * AHAT_HEIGHT);
-    static constexpr size_t ROI_ROW_UPPER = (size_t) (0.55 * AHAT_HEIGHT);
-    static constexpr size_t ROI_COL_LOWER = (size_t) (0.3 * AHAT_WIDTH);
-    static constexpr size_t ROI_COL_UPPER = (size_t) (0.7 * AHAT_WIDTH);
-    static constexpr uint16_t DEPTH_NEAR_CLIP = 200; // Unit: mm
+    static constexpr size_t ROI_ROW_LOWER = 256 - 168;
+    static constexpr size_t ROI_ROW_UPPER = 256 + 80;
+    static constexpr size_t ROI_COL_LOWER = 256 - 128;
+    static constexpr size_t ROI_COL_UPPER = 256 + 128;
+    static constexpr uint16_t DEPTH_NEAR_CLIP = 200;  // Unit: mm
     static constexpr uint16_t DEPTH_FAR_CLIP = 800;
 
-    constexpr size_t roiColLower = 256 - 128;
-    constexpr size_t roiColUpper = 256 + 128;
-    constexpr size_t roiRowLower = 256 - 168;
-    constexpr size_t roiRowUpper = 256 + 80;
-    constexpr size_t clippedDepthFrameWidth = roiColUpper - roiColLower;
-    constexpr size_t clippedDepthFrameHeight = roiRowUpper - roiRowLower;
+    static constexpr size_t CLIPPED_DEPTH_FRAME_WIDTH = ROI_COL_UPPER - ROI_COL_LOWER;
+    static constexpr size_t CLIPPED_DEPTH_FRAME_HEIGHT = ROI_ROW_UPPER - ROI_ROW_LOWER;
 
+    std::vector<AHATDepth> clippedDepthFrames;
+    std::vector<float> clippedDepthMovingSum;
     size_t stdLogIndex = 0;
     static constexpr size_t STD_LOG_SIZE = 10;
-    static constexpr float MAX_STD_VAL = 0.01*0.01; // squared value on purpose
+
     std::vector<float> stdVal;
-    std::vector<float> depthMovingAverage;
-    std::vector<std::vector<float>> stdDepthVec;
+    static constexpr float MAX_STD_VAL = 13000.0f; // squared value on purpose
+
+
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;
     std::mutex pcdMutex;
 
     DirectX::XMMATRIX extrinsics;
-    DirectX::XMMATRIX depthCameraPoseInvMatrix;
+    DirectX::XMMATRIX cam2rig;
     std::vector<DirectX::XMVECTOR> lhMesh;
     std::vector<float> lhDistances;
     std::vector<DirectX::XMVECTOR> rhMesh;
@@ -57,7 +53,13 @@ private:
 
     std::vector<DirectX::XMVECTOR> lut;
 
-    std::vector<std::vector<int>> handBones; // Left;
+    const std::vector<std::vector<int>> handBones = {
+            /* Thumb  */ {1, 2 }, /**/ {2, 3  }, /**/ {3, 4  }, /**/ {4, 5  },
+            /* Index  */ {1, 6 }, /**/ {6, 7  }, /**/ {7, 8  }, /**/ {8, 9  }, /**/ {9, 10 },
+            /* Middle */ {1, 11}, /**/ {11, 12}, /**/ {12, 13}, /**/ {13, 14}, /**/ {14, 15},
+            /* Ring   */ {1, 16}, /**/ {16, 17}, /**/ {17, 18}, /**/ {18, 19}, /**/ {19, 20},
+            /* Pinky  */ {1, 21}, /**/ {21, 22}, /**/ {22, 23}, /**/ {23, 24}, /**/ {24, 25}
+    };
     //std::vector<std::vector<int>> handBonesRight;
     std::vector<float> fingerSizes;
     static constexpr float WRIST_RADIUS = 0.05;

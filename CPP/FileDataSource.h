@@ -5,7 +5,7 @@
 #ifndef HOLOSCANNER_FILEDATASOURCE_H
 #define HOLOSCANNER_FILEDATASOURCE_H
 
-#include "DepthDataTypes.h"
+#include "RawDataTypes.h"
 #include "InteractionDataTypes.h"
 #include "PCDDataTypes.h"
 #include <filesystem>

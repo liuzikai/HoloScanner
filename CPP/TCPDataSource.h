@@ -5,13 +5,12 @@
 #ifndef HOLOSCANNER_TCPDATASOURCE_H
 #define HOLOSCANNER_TCPDATASOURCE_H
 
-#include "DepthDataTypes.h"
-#include "InteractionDataTypes.h"
+#include "RawDataTypes.h"
 #include "PCDDataTypes.h"
 #include "TerminalSocket.h"
 #include <queue>
 
-class TCPDataSource : public AHATSource, public InteractionSource, public PCDSource {
+class TCPDataSource : public RawDataSource, public PCDSource {
 public:
     explicit TCPDataSource();
 
@@ -21,9 +20,7 @@ public:
 
     bool getAHATDepthLUT(AHATLUT &lut) override;
 
-    bool getNextAHATFrame(timestamp_t &timestamp, AHATDepth &depth, DirectX::XMMATRIX &rig2world) override;
-
-    bool getNextInteractionFrame(timestamp_t &timestamp, InteractionFrame &frame) override;
+    bool getNextRawDataFrame(RawDataFrame &frame) override;
 
     bool getNextPCD(timestamp_t &timestamp, PCD &pcd) override;
 
@@ -43,14 +40,11 @@ private:
     std::vector<float> ahatLUT;
     std::mutex ahatStaticDataMutex;
 
-    std::queue<AHATFrame> ahatFrames;
-    std::mutex ahatFrameMutex;
+    std::queue<RawDataFrame> rawDataFrames;
+    std::mutex rawDataFrameMutex;
 
     std::queue<std::pair<timestamp_t, PCD>> pcdFrames;
     std::mutex pcdMutex;
-
-    std::queue<std::pair<timestamp_t, InteractionFrame>> interactionFrames;
-    std::mutex interactionMutex;
 };
 
 

@@ -19,7 +19,6 @@
 #include "DepthProcessor.h"
 #include "DirectXHelpers.h"
 #include "EigenHelpers.h"
-#include "FileDataSource.h"
 
 class DepthProcessorWrapper : public DepthProcessor, public PCDSource {
 public:
@@ -45,8 +44,7 @@ public:
 
 bool discardDelayedFrames = false;
 
-AHATSource *ahatSource = nullptr;
-InteractionSource *interactionSource = nullptr;
+RawDataSource *rawDataSource = nullptr;
 
 std::unique_ptr<DepthProcessorWrapper> depthProcessor;
 
@@ -63,79 +61,56 @@ static const Eigen::RowVector3d HAND_COLOR[HandIndexCount] = {Eigen::RowVector3d
 Eigen::MatrixXd BOTH_HANDS_EDGE_COLORS(48, 3);
 
 bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
-    // static to hold the latest data
+    // static to hold the latest data to redraw on tracking lost
     static timestamp_t pcdTimestamp;
     static PCD pcd;
+    static bool lostTracking = false;
 
-    static timestamp_t interationTimestamp;
-    static InteractionFrame interactionFrame;
+    RawDataFrame rawDataFrame;
 
     if (!depthProcessor) {
         DirectX::XMMATRIX ahatExtrinsics;
         std::vector<float> ahatLUT;
-        if (!ahatSource || !ahatSource->getAHATExtrinsics(ahatExtrinsics)) return false;
-        if (!ahatSource || !ahatSource->getAHATDepthLUT(ahatLUT)) return false;
+        if (!rawDataSource || !rawDataSource->getAHATExtrinsics(ahatExtrinsics)) return false;
+        if (!rawDataSource || !rawDataSource->getAHATDepthLUT(ahatLUT)) return false;
         depthProcessor = std::make_unique<DepthProcessorWrapper>(ahatExtrinsics, ahatLUT.data());
         std::cout << "Create DepthProcessor with AHAT extrinsics and LUT" << std::endl;
     }
 
     bool redraw = false;
-    bool lostTracking = false;
 
-    if (ahatSource) {
-        timestamp_t ahatTimestamp;
-        AHATDepth depth;
-        DirectX::XMMATRIX rig2world;
-
+    if (rawDataSource) {
         do {
-            if (!ahatSource->getNextAHATFrame(ahatTimestamp, depth, rig2world)) break;
-            // std::cout << "[DEPTH] " << ahatTimestamp << std::endl;
-            depthProcessor->updateAHAT(ahatTimestamp, depth.data(), rig2world);
+            if (!rawDataSource->getNextRawDataFrame(rawDataFrame)) break;
+
+            bool newLostTracking = !depthProcessor->update(rawDataFrame);
+            if (newLostTracking != lostTracking) {
+                redraw = true;
+            }
+            lostTracking = newLostTracking;
+
+#if 0
+            std::cout << "[Raw] " << rawDataFrame.timestamp << "    lostTracking = " << lostTracking << std::endl;
+#endif
+
         } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
     }
 
     if (depthProcessor) {
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
-            // std::cout << "[PCD] " << pcdTimestamp << std::endl;
-//            redraw = true;
-// FIXME: not trigger update for now
-        } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
-    }
 
-    if (interactionSource) {
-        do {
-            timestamp_t newInterationTimestamp;
-            InteractionFrame newInteractionFrame;
-            if (!interactionSource->getNextInteractionFrame(newInterationTimestamp, newInteractionFrame)) break;
-            std::cout << "[INT] "
-                      << " L: " << newInteractionFrame.hands[Left].tracked << "/"
-                      << countTrackedJoints(newInteractionFrame.hands[Left])
-                      << " R: " << newInteractionFrame.hands[Right].tracked << "/"
-                      << countTrackedJoints(newInteractionFrame.hands[Right])
-                      << std::endl;
+#if 0
+            std::cout << "[PCD] " << pcdTimestamp << std::endl;
+#endif
             redraw = true;
 
-            if (newInteractionFrame.hands[Left].tracked && countTrackedJoints(newInteractionFrame.hands[Left]) == 0 ||
-                newInteractionFrame.hands[Right].tracked && countTrackedJoints(newInteractionFrame.hands[Right]) == 0) {
-                std::cout << "Discard frame on tracking" << std::endl;
-                lostTracking = true;
-                // should redraw but should not update interaction data
-            } else {
-                lostTracking = false;
-            }
-
-            if (!lostTracking) {
-                interationTimestamp = newInterationTimestamp;
-                interactionFrame = newInteractionFrame;
-            }
-
         } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
     }
 
-    bool leftTracked = interactionFrame.hands[Left].tracked && countTrackedJoints(interactionFrame.hands[Left]);
-    bool rightTracked = interactionFrame.hands[Right].tracked && countTrackedJoints(interactionFrame.hands[Right]);
-    if (!leftTracked || !rightTracked) lostTracking = true;
+    // FIXME: duplicated code
+    bool leftTracked = rawDataFrame.hands[Left].tracked && countTrackedJoints(rawDataFrame.hands[Left]);
+    bool rightTracked = rawDataFrame.hands[Right].tracked && countTrackedJoints(rawDataFrame.hands[Right]);
 
     if (redraw) {
         viewer.data().clear();
@@ -149,7 +124,8 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                                  lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
 
         // Interaction
-        if (!lostTracking) {
+//        if (!lostTracking)
+        {
             if (leftTracked && rightTracked) {
                 // Both hands
 
@@ -173,7 +149,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                 for (int i = 0; i < HandIndexCount; i++) {
                     for (int j = 0; j < HandJointIndexCount; j++) {
                         jointPoints.row(i * HandJointIndexCount + j) = XMVectorToEigenVector3d(
-                                XMTransformToTranslate(interactionFrame.hands[i].joints[j].transformation));
+                                rawDataFrame.hands[i].joints[j].translationInRig);
                     }
                 }
                 viewer.data().set_edges(jointPoints, EDGES_BOTH_HANDS, BOTH_HANDS_EDGE_COLORS);
@@ -193,17 +169,19 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                 Eigen::MatrixXd jointPoints((int) HandJointIndexCount, 3);
                 for (int j = 0; j < HandJointIndexCount; j++) {
                     jointPoints.row(j) = XMVectorToEigenVector3d(
-                            XMTransformToTranslate(interactionFrame.hands[i].joints[j].transformation));
+                            rawDataFrame.hands[i].joints[j].translationInRig);
                 }
                 viewer.data().set_edges(jointPoints, EDGES_SINGLE_HAND, HAND_COLOR[i]);
             }
         }
 
         // Set camera on first frame
-        static bool is_first_frame = true;
-        if (is_first_frame) {
-            viewer.core().align_camera_center(points);
-            is_first_frame = false;
+        static int warm_up_frame = 20;
+        if (warm_up_frame > 0) {
+            warm_up_frame--;
+            if (warm_up_frame == 0) {
+                viewer.core().align_camera_center(points);
+            }
         }
     }
 
@@ -216,8 +194,7 @@ int main() {
 #ifdef BOOST_AVAILABLE
     TCPDataSource tcpStreamingSource;
     discardDelayedFrames = true;
-    ahatSource = static_cast<AHATSource *>(&tcpStreamingSource);
-    interactionSource = static_cast<InteractionSource *>(&tcpStreamingSource);
+    rawDataSource = static_cast<RawDataSource *>(&tcpStreamingSource);
 #else
 #error "Boost not available"
 #endif

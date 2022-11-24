@@ -2,9 +2,10 @@
 // Created by Zikai Liu on 11/12/22.
 //
 
-#include "TCPDataSource.h"
 #include <iostream>
 #include <ctime>
+#include "DirectXHelpers.h"
+#include "TCPDataSource.h"
 
 TCPDataSource::TCPDataSource() :
         socketServer(tcpIOContext, PORT, [](auto s) {
@@ -43,22 +44,11 @@ bool TCPDataSource::getAHATDepthLUT(AHATLUT &lut) {
     return true;
 }
 
-bool TCPDataSource::getNextAHATFrame(timestamp_t &timestamp, AHATDepth &depth, DirectX::XMMATRIX &rig2world) {
-    std::lock_guard<std::mutex> lock(ahatFrameMutex);
-    if (ahatFrames.empty()) return false;
-    timestamp = ahatFrames.front().timestamp;
-    depth = std::move(ahatFrames.front().depth);
-    rig2world = ahatFrames.front().rig2world;
-    ahatFrames.pop();
-    return true;
-}
-
-bool TCPDataSource::getNextInteractionFrame(timestamp_t &timestamp, InteractionFrame &frame) {
-    std::lock_guard<std::mutex> lock(interactionMutex);
-    if (interactionFrames.empty()) return false;
-    timestamp = interactionFrames.front().first;
-    frame = interactionFrames.front().second;
-    interactionFrames.pop();
+bool TCPDataSource::getNextRawDataFrame(RawDataFrame &frame) {
+    std::lock_guard<std::mutex> lock(rawDataFrameMutex);
+    if (rawDataFrames.empty()) return false;
+    frame = std::move(rawDataFrames.front());  // TODO: not sure if rvalue-reference works for vectors inside struct
+    rawDataFrames.pop();
     return true;
 }
 
@@ -101,79 +91,84 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
             ahatLUT = std::vector<float>(fbuf, fbuf + (EXPECTED_SIZE / sizeof(float)));
         }
 
-    } else if (name == "d") {  // AHAT depth
-        AHATFrame frame;
+    } else if (name == "R") {  // raw data: AHAT depth + rig2world + interaction
+        RawDataFrame frame;
 
-        // TODO: use timestamp from HoloLens
-        frame.timestamp = time(nullptr);
-
-        static constexpr size_t EXPECTED_DEPTH_SIZE = AHAT_WIDTH * AHAT_HEIGHT * sizeof(uint16_t);
-        static constexpr size_t EXPECTED_RIG2WORLD_SIZE = 16 * sizeof(float);
-        if (size != EXPECTED_DEPTH_SIZE + EXPECTED_RIG2WORLD_SIZE) {
-            std::cerr << "Invalid point cloud size: " << size << ", expecting "
-                      << EXPECTED_DEPTH_SIZE + EXPECTED_RIG2WORLD_SIZE << std::endl;
-            return;
-        }
-
-        auto ubuf = (const uint16_t *) buf;
-        frame.depth.assign(ubuf, ubuf + (EXPECTED_DEPTH_SIZE / sizeof(uint16_t)));
-
-        auto fbuf = (const float *) (buf + EXPECTED_DEPTH_SIZE);
-        frame.rig2world = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
-
-        // Save the data
-        {
-            std::lock_guard<std::mutex> lock(ahatFrameMutex);
-            ahatFrames.emplace(std::move(frame));
-        }
-    } else if (name == "i") {  // interaction
-        std::pair<timestamp_t, InteractionFrame> frame;
-
-        // TODO: use timestamp from HoloLens
-        frame.first = time(nullptr);
-
-        static constexpr size_t EXPECTED_SIZE =
+        static constexpr size_t TIMESTAMP_SIZE = sizeof(timestamp_t);
+        static_assert(sizeof(timestamp_t) == sizeof(int64_t), "timestamp_t not correct");
+        static constexpr size_t DEPTH_SIZE = AHAT_WIDTH * AHAT_HEIGHT * sizeof(uint16_t);
+        static constexpr size_t RIG2WORLD_SIZE = 16 * sizeof(float);
+        static constexpr size_t INTERACTION_SIZE =
                 (16 + HandIndexCount * (1 + HandJointIndexCount * (1 + 16)) + 1 + 4 + 4) * sizeof(float);
-        if (size != EXPECTED_SIZE) {
-            std::cerr << "Invalid interaction frame size: " << size << ", expecting " << EXPECTED_SIZE << std::endl;
+        static constexpr size_t TOTAL_SIZE = TIMESTAMP_SIZE + DEPTH_SIZE + RIG2WORLD_SIZE + INTERACTION_SIZE;
+        if (size != TOTAL_SIZE) {
+            std::cerr << "Invalid raw data size size: " << size << ", expecting " << TOTAL_SIZE << std::endl;
             return;
         }
 
-        auto &f = frame.second;
-        auto fbuf = (const float *) buf;
+        // Timestamp
+        {
+            frame.timestamp = *(reinterpret_cast<const timestamp_t *>(buf));
+            buf += TIMESTAMP_SIZE;
+        }
 
-        // Head
-        f.headTransformation = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
-        fbuf += 16;
+        // Depth
+        {
+            auto ubuf = reinterpret_cast<const uint16_t *>(buf);
+            frame.depth.assign(ubuf, ubuf + (DEPTH_SIZE / sizeof(uint16_t)));
+            buf += DEPTH_SIZE;
+        }
 
-        // Hands
-        for (auto &hand: f.hands) {
-            hand.tracked = (*fbuf == 1.0f);
-            fbuf++;
+        // Rig2world
+        {
+            auto fbuf = reinterpret_cast<const float *>(buf);
+            frame.rig2world = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
+            buf += RIG2WORLD_SIZE;
+        }
+        DirectX::XMMATRIX world2rig = DirectX::XMMatrixTranspose(frame.rig2world);
 
-            for (auto &joint: hand.joints) {
-                joint.tracked = (*fbuf == 1.0f);
+        // Interaction
+        {
+            auto fbuf = reinterpret_cast<const float *>(buf);
+
+            // Head
+            frame.headTransformation = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
+            fbuf += 16;
+
+            // Hands
+            for (auto &hand: frame.hands) {
+                hand.tracked = (*fbuf == 1.0f);
                 fbuf++;
 
-                joint.transformation = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
-                fbuf += 16;
+                for (auto &joint: hand.joints) {
+                    joint.tracked = (*fbuf == 1.0f);
+                    fbuf++;
+
+                    joint.transformationInWorld = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
+                    fbuf += 16;
+
+                    joint.translationInRig = XMVector3Transform(XMTransformToTranslate(joint.transformationInWorld),
+                                                                world2rig);
+                }
             }
+
+            // Eye
+            frame.eyeTracked = (*fbuf == 1.0f);
+            fbuf++;
+
+            frame.eyeOrigin = DirectX::XMLoadFloat4((const DirectX::XMFLOAT4 *) fbuf);
+            fbuf += 4;
+
+            frame.eyeDirection = DirectX::XMLoadFloat4((const DirectX::XMFLOAT4 *) fbuf);
+            fbuf += 4;
+
+            buf += INTERACTION_SIZE;
         }
-
-        // Eye
-        f.eyeTracked = (*fbuf == 1.0f);
-        fbuf++;
-
-        f.eyeOrigin = DirectX::XMLoadFloat4((const DirectX::XMFLOAT4 *) fbuf);
-        fbuf += 4;
-
-        f.eyeDirection = DirectX::XMLoadFloat4((const DirectX::XMFLOAT4 *) fbuf);
-        fbuf += 4;
 
         // Save the data
         {
-            std::lock_guard<std::mutex> lock(interactionMutex);
-            interactionFrames.emplace(std::move(frame));
+            std::lock_guard<std::mutex> lock(rawDataFrameMutex);
+            rawDataFrames.emplace(std::move(frame));
         }
 
     } else if (name == "p") {  // point cloud

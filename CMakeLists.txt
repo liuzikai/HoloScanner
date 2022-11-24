@@ -43,7 +43,7 @@ endif ()
 
 # Pipeline: DepthToPCD
 add_executable(DepthToPCD
-        CPP/FileDataSource.cpp
+#        CPP/FileDataSource.cpp
         CPP/DepthProcessor.cpp
         CPP/Pipelines/DepthToPCD.cpp
         CPP/Registrator.cpp

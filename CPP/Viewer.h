@@ -5,7 +5,6 @@
 #ifndef HOLOSCANNER_VIEWER_H
 #define HOLOSCANNER_VIEWER_H
 
-#include "InteractionDataTypes.h"
 #include "PCDDataTypes.h"
 
 #include <igl/read_triangle_mesh.h>
