@@ -196,7 +196,7 @@ public class TCPClient : MonoBehaviour
             dw.WriteByte(0);  // NUL-termination
 
             // Write length in bytes
-            dw.WriteInt32(sizeof(long) + ahatDepth.Length * sizeof(ushort) + rigToWorld.Length * sizeof(float) + interaction.length * sizeof(float));
+            dw.WriteInt32(sizeof(long) + ahatDepth.Length * sizeof(ushort) + rigToWorld.Length * sizeof(float) + interaction.Length * sizeof(float));
 
             // Write actual data
             dw.WriteInt64(timestamp);

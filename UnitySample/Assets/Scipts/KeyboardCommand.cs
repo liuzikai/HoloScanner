@@ -13,12 +13,12 @@ public class KeyboardCommand : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-#if ENABLE_WINMD_SUPPORT
+/* #if ENABLE_WINMD_SUPPORT
         if (Input.GetKeyDown(KeyCode.Space))
         {
             rm.SendRawData();
         }
-#endif
+#endif */
     }
 
     public void Exit() {

@@ -575,6 +575,8 @@ public class ResearchModeVideoStream : MonoBehaviour
         SerializeVector4(data, interactions.GetEyeGazeDirection());
 
         return data.ToArray();
+#else
+        return new float[] {};
 #endif
     }
 
