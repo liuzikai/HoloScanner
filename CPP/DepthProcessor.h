@@ -19,6 +19,8 @@ public:
 
     bool getNextPCDRaw(timestamp_t &timestamp, PCDRaw &pcdRaw);
 
+    bool getNextHandDebugFrame(timestamp_t& timestamp, HandDebugFrame& hdFrame);
+
 public:
 
     static constexpr size_t ROI_ROW_LOWER = 256 - 168;
@@ -41,6 +43,7 @@ public:
 
 
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;
+    std::queue<HandDebugFrame> handMeshDebugQueue;
     std::mutex pcdMutex;
 
     DirectX::XMMATRIX extrinsics;
@@ -48,7 +51,8 @@ public:
 
     std::vector<DirectX::XMVECTOR> lut;
 
-    std::vector<DirectX::XMVECTOR> handMesh[HandIndexCount];
+    Mesh handMesh[HandIndexCount];
+    Indices handMeshIndices[HandIndexCount];
     std::vector<float> handFilterDistanceSq[HandIndexCount];  // squared distances
 
     // @formatter:off
@@ -71,8 +75,51 @@ public:
     };
     static_assert(sizeof(DepthProcessor::FINGER_SIZES) == HandJointIndexCount * sizeof(float), "FINGER_SIZES");
 
+    void wristNormals(
+        const DirectX::XMVECTOR& wrist,
+        const DirectX::XMVECTOR& palm,
+        const DirectX::XMVECTOR& indexMetacarpal,
+        const DirectX::XMVECTOR& pinkyMetacarpal,
+        float dist,
+        bool isRightHand,
+        DirectX::XMVECTOR& nDir,
+        DirectX::XMVECTOR& nTDir,
+        std::vector<DirectX::XMVECTOR>& vertices,
+        std::vector<std::vector<int>>& indices,
+        std::vector<float>& filterDistanceSq
+    );
+    void fingerNormals(
+        const DirectX::XMVECTOR& tip,
+        const DirectX::XMVECTOR& distal,
+        const DirectX::XMVECTOR& intermediate,
+        const DirectX::XMVECTOR& proximal,
+        const DirectX::XMVECTOR& nDir,
+        const DirectX::XMVECTOR& nTDir,
+        float dist,
+        bool flip,
+        bool indexOrPinky,
+        std::vector<DirectX::XMVECTOR>& vertices,
+        std::vector<std::vector<int>>& indices,
+        std::vector<float>& filterDistanceSq
+    );
 
-    bool updateHandMesh(const Hand &hand, std::vector<DirectX::XMVECTOR> &mesh, std::vector<float> &filterDistanceSq);
+    void thumbNormals(
+        const DirectX::XMVECTOR& tip,
+        const DirectX::XMVECTOR& distal,
+        const DirectX::XMVECTOR& proximal,
+        const DirectX::XMVECTOR& nTDir,
+        float dist,
+        bool isRightHand,
+        std::vector<DirectX::XMVECTOR>& vertices,
+        std::vector<std::vector<int>>& indices,
+        std::vector<float>& filterDistanceSq
+    );
+    bool updateHandMesh(
+        const Hand &hand, 
+        std::vector<DirectX::XMVECTOR> &vertices,
+        std::vector<std::vector<int>> &indices,
+        std::vector<float> &filterDistanceSq
+    );
 
     bool inHandMesh(const DirectX::XMVECTOR &point);
 };

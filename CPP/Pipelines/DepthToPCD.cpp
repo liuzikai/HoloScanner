@@ -64,6 +64,10 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     static PCD pcd;
     static bool lostTracking = false;
 
+    static timestamp_t handTimestamp;
+    static HandDebugFrame debugHandFrame;
+    bool hasDebugHand = false;
+
     RawDataFrame rawDataFrame;
 
     if (!depthProcessor) {
@@ -95,7 +99,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     if (depthProcessor) {
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
-
+            hasDebugHand = depthProcessor->getNextHandDebugFrame(handTimestamp, debugHandFrame);
 #if 1
             std::cout << "[PCD] " << pcd.size() << std::endl;
 #endif
@@ -143,56 +147,92 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         bool leftTracked = rawDataFrame.hands[Left].strictlyTracked;
         bool rightTracked = rawDataFrame.hands[Right].strictlyTracked;
 
-        if (!lostTracking)
-        {
-            if (leftTracked && rightTracked) {
-                // Both hands
+        if (!lostTracking && hasDebugHand) {
+            if (leftTracked) {
+                int lhvSize = static_cast<int>(debugHandFrame.lhMesh.size());
+                int lhiSize = static_cast<int>(debugHandFrame.lhIndices.size());
+                Eigen::MatrixXd jointPoints(lhvSize, 3);
+                Eigen::MatrixXi jointIndices(lhiSize, 2);
 
-                static const Eigen::MatrixXi EDGES_BOTH_HANDS = (Eigen::MatrixXi(48, 2)
-                        <<
-                        /* Left  */
-                        /* Thumb  */ 1, 2, /**/ 2, 3, /**/ 3, 4, /**/ 4, 5,
-                        /* Index  */ 1, 6, /**/ 6, 7, /**/ 7, 8, /**/ 8, 9, /**/ 9, 10,
-                        /* Middle */ 1, 11, /**/ 11, 12, /**/ 12, 13, /**/ 13, 14, /**/ 14, 15,
-                        /* Ring   */ 1, 16, /**/ 16, 17, /**/ 17, 18, /**/ 18, 19, /**/ 19, 20,
-                        /* Pinky  */ 1, 21, /**/ 21, 22, /**/ 22, 23, /**/ 23, 24, /**/ 24, 25,
-                        /* Right  */
-                        /* Thumb  */ 27, 28, /**/ 28, 29, /**/ 29, 30, /**/ 30, 31,
-                        /* Index  */ 27, 32, /**/ 32, 33, /**/ 33, 34, /**/ 34, 35, /**/ 35, 36,
-                        /* Middle */ 27, 37, /**/ 37, 38, /**/ 38, 39, /**/ 39, 40, /**/ 40, 41,
-                        /* Ring   */ 27, 42, /**/ 42, 43, /**/ 43, 44, /**/ 44, 45, /**/ 45, 46,
-                        /* Pinky  */ 27, 47, /**/ 47, 48, /**/ 48, 49, /**/ 49, 50, /**/ 50, 51).finished();
+                for (int j = 0; j < lhvSize; j++) {
+                    jointPoints.row(j) = XMVectorToEigenVector3d(debugHandFrame.lhMesh[j]);
+                }
 
-                Eigen::MatrixXd jointPoints((int) HandJointIndexCount * 2, 3);
+                for (int j = 0; j < lhiSize; j++) {
+                    jointIndices.row(j) << debugHandFrame.lhIndices[j][0], debugHandFrame.lhIndices[j][1];
+                }
 
-                for (int i = 0; i < HandIndexCount; i++) {
-                    for (int j = 0; j < HandJointIndexCount; j++) {
-                        jointPoints.row(i * HandJointIndexCount + j) = XMVectorToEigenVector3d(
-                                rawDataFrame.hands[i].joints[j].translationInRig);
+                viewer.data().set_edges(jointPoints, jointIndices, Eigen::RowVector3d(0, 1, 0));
+            }
+
+            if (rightTracked) {
+                int rhvSize = static_cast<int>(debugHandFrame.rhMesh.size());
+                int rhiSize = static_cast<int>(debugHandFrame.rhIndices.size());
+                Eigen::MatrixXd jointPoints(rhvSize, 3);
+                Eigen::MatrixXi jointIndices(rhiSize, 2);
+
+                    for (int j = 0; j < rhvSize; j++) {
+                        jointPoints.row(j) = XMVectorToEigenVector3d(debugHandFrame.rhMesh[j]);
                     }
+
+                for (int j = 0; j < rhiSize; j++) {
+                    jointIndices.row(j) << debugHandFrame.rhIndices[j][0], debugHandFrame.rhIndices[j][1];
                 }
-                viewer.data().set_edges(jointPoints, EDGES_BOTH_HANDS, BOTH_HANDS_EDGE_COLORS);
 
-            } else if (leftTracked || rightTracked) {
-                // Single hand
-
-                int i = leftTracked ? Left : Right;
-                static const Eigen::MatrixXi EDGES_SINGLE_HAND = (Eigen::MatrixXi(24, 2)
-                        <<
-                        /* Thumb  */ 1, 2, /**/ 2, 3, /**/ 3, 4, /**/ 4, 5,
-                        /* Index  */ 1, 6, /**/ 6, 7, /**/ 7, 8, /**/ 8, 9, /**/ 9, 10,
-                        /* Middle */ 1, 11, /**/ 11, 12, /**/ 12, 13, /**/ 13, 14, /**/ 14, 15,
-                        /* Ring   */ 1, 16, /**/ 16, 17, /**/ 17, 18, /**/ 18, 19, /**/ 19, 20,
-                        /* Pinky  */ 1, 21, /**/ 21, 22, /**/ 22, 23, /**/ 23, 24, /**/ 24, 25).finished();
-
-                Eigen::MatrixXd jointPoints((int) HandJointIndexCount, 3);
-                for (int j = 0; j < HandJointIndexCount; j++) {
-                    jointPoints.row(j) = XMVectorToEigenVector3d(
-                            rawDataFrame.hands[i].joints[j].translationInRig);
-                }
-                viewer.data().set_edges(jointPoints, EDGES_SINGLE_HAND, HAND_COLOR[i]);
+                viewer.data().set_edges(jointPoints, jointIndices, Eigen::RowVector3d(1, 0, 0));
             }
         }
+
+        //if (!lostTracking)
+        //{
+        //    if (leftTracked && rightTracked) {
+        //        // Both hands
+
+        //        static const Eigen::MatrixXi EDGES_BOTH_HANDS = (Eigen::MatrixXi(48, 2)
+        //                <<
+        //                /* Left  */
+        //                /* Thumb  */ 1, 2, /**/ 2, 3, /**/ 3, 4, /**/ 4, 5,
+        //                /* Index  */ 1, 6, /**/ 6, 7, /**/ 7, 8, /**/ 8, 9, /**/ 9, 10,
+        //                /* Middle */ 1, 11, /**/ 11, 12, /**/ 12, 13, /**/ 13, 14, /**/ 14, 15,
+        //                /* Ring   */ 1, 16, /**/ 16, 17, /**/ 17, 18, /**/ 18, 19, /**/ 19, 20,
+        //                /* Pinky  */ 1, 21, /**/ 21, 22, /**/ 22, 23, /**/ 23, 24, /**/ 24, 25,
+        //                /* Right  */
+        //                /* Thumb  */ 27, 28, /**/ 28, 29, /**/ 29, 30, /**/ 30, 31,
+        //                /* Index  */ 27, 32, /**/ 32, 33, /**/ 33, 34, /**/ 34, 35, /**/ 35, 36,
+        //                /* Middle */ 27, 37, /**/ 37, 38, /**/ 38, 39, /**/ 39, 40, /**/ 40, 41,
+        //                /* Ring   */ 27, 42, /**/ 42, 43, /**/ 43, 44, /**/ 44, 45, /**/ 45, 46,
+        //                /* Pinky  */ 27, 47, /**/ 47, 48, /**/ 48, 49, /**/ 49, 50, /**/ 50, 51).finished();
+
+        //        Eigen::MatrixXd jointPoints((int) HandJointIndexCount * 2, 3);
+
+        //        for (int i = 0; i < HandIndexCount; i++) {
+        //            for (int j = 0; j < HandJointIndexCount; j++) {
+        //                jointPoints.row(i * HandJointIndexCount + j) = XMVectorToEigenVector3d(
+        //                        rawDataFrame.hands[i].joints[j].translationInRig);
+        //            }
+        //        }
+        //        viewer.data().set_edges(jointPoints, EDGES_BOTH_HANDS, BOTH_HANDS_EDGE_COLORS);
+
+        //    } else if (leftTracked || rightTracked) {
+        //        // Single hand
+
+        //        int i = leftTracked ? Left : Right;
+        //        static const Eigen::MatrixXi EDGES_SINGLE_HAND = (Eigen::MatrixXi(24, 2)
+        //                <<
+        //                /* Thumb  */ 1, 2, /**/ 2, 3, /**/ 3, 4, /**/ 4, 5,
+        //                /* Index  */ 1, 6, /**/ 6, 7, /**/ 7, 8, /**/ 8, 9, /**/ 9, 10,
+        //                /* Middle */ 1, 11, /**/ 11, 12, /**/ 12, 13, /**/ 13, 14, /**/ 14, 15,
+        //                /* Ring   */ 1, 16, /**/ 16, 17, /**/ 17, 18, /**/ 18, 19, /**/ 19, 20,
+        //                /* Pinky  */ 1, 21, /**/ 21, 22, /**/ 22, 23, /**/ 23, 24, /**/ 24, 25).finished();
+
+        //        Eigen::MatrixXd jointPoints((int) HandJointIndexCount, 3);
+        //        for (int j = 0; j < HandJointIndexCount; j++) {
+        //            jointPoints.row(j) = XMVectorToEigenVector3d(
+        //                    rawDataFrame.hands[i].joints[j].translationInRig);
+        //        }
+        //        viewer.data().set_edges(jointPoints, EDGES_SINGLE_HAND, HAND_COLOR[i]);
+        //    }
+        //}
 #endif
     }
 
