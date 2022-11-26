@@ -17,6 +17,8 @@
 
 #include "TCPDataSource.h"
 #include "EigenHelpers.h"
+#include "Registrator.h"
+#include "DirectXHelpers.h"
 
 TCPDataSource tcpStreamingSource;
 
@@ -25,7 +27,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     static PCD pcd;
 
     static timestamp_t interationTimestamp;
-    static InteractionFrame interactionFrame;
+    static RawDataFrame interactionFrame;
 
     bool updated = false;
 
@@ -34,7 +36,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         /*std::cout << "[PCD] " << pcdTimestamp << std::endl;*/
     }
 
-    if (tcpStreamingSource.getNextInteractionFrame(interationTimestamp, interactionFrame)) {
+    if (tcpStreamingSource.getNextRawDataFrame(interactionFrame)) {
         updated = true;
         /*std::cout << "[INT] " << interationTimestamp
                   << " Left Hand Tracked: " << interactionFrame.hands[Left].tracked
@@ -61,7 +63,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
             Eigen::MatrixXd jointPoints((int) HandJointIndexCount, 3);
             for (int j = 0; j < HandJointIndexCount; j++) {
                 jointPoints.row(j) = XMVectorToEigenVector3d(
-                        XMTransformToTranslate(interactionFrame.hands[i].joints[j].transformation));
+                        XMTransformToTranslate(interactionFrame.hands[i].joints[j].transformationInWorld));
             }
 
             static const Eigen::MatrixXi edgesBetweenJoints = (Eigen::MatrixXi(24, 2) << 1, 2,
@@ -110,6 +112,8 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 }
 
 int main() {
+    Registrator registrator;
+
     igl::opengl::glfw::Viewer viewer;
     viewer.callback_pre_draw = callBackPerDraw;
     viewer.core().set_rotation_type(igl::opengl::ViewerCore::ROTATION_TYPE_TRACKBALL);

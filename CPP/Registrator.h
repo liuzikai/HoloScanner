@@ -8,8 +8,9 @@
 #include <memory>
 #include <string>
 #include <open3d/geometry/PointCloud.h>
+#include <PCDDataTypes.h>
 
-using PCD = std::vector<Eigen::Vector3d>; //Note: Open3D requires Vector3d, not Vector3f
+//using PCD = std::vector<Eigen::Vector3d>; //Note: Open3D requires Vector3d, not Vector3f
 
 class Registrator {
 public:

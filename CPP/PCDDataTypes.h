@@ -8,7 +8,7 @@
 #include <vector>
 #include <Eigen/Eigen>
 
-using PCD = std::vector<Eigen::Vector3f>;  // point cloud data
+using PCD = std::vector<Eigen::Vector3d>;  // point cloud data
 
 class PCDSource {
 public:

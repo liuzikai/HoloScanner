@@ -66,7 +66,9 @@ add_executable(PCD
         )
 target_link_libraries(PCD
         DirectXMath
-        ${LIGIGL_LIBERIES})
+        ${LIGIGL_LIBERIES}
+        Open3D::Open3D
+        )
 if (TARGET libTCPServer)
     target_link_libraries(PCD libTCPServer)
     target_compile_definitions(PCD PUBLIC BOOST_AVAILABLE)

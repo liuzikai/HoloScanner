@@ -22,6 +22,7 @@
 #include "DepthProcessor.h"
 #include "DirectXHelpers.h"
 #include "EigenHelpers.h"
+#include "PCDDataTypes.h"
 
 class DepthProcessorWrapper : public DepthProcessor, public PCDSource {
 public:
