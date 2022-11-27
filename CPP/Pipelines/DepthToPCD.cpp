@@ -23,6 +23,7 @@
 #include "DirectXHelpers.h"
 #include "EigenHelpers.h"
 #include "PCDDataTypes.h"
+#include "Registrator.h"
 
 class DepthProcessorWrapper : public DepthProcessor, public PCDSource {
 public:
@@ -46,6 +47,10 @@ public:
         }
     }
 };
+
+Registrator registrator;
+
+Eigen::MatrixXd ReconstructedPCD;
 
 bool discardDelayedFrames = false;
 
@@ -93,9 +98,12 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         lostTracking = newLostTracking;
     }
 
+    bool merge_successful = false;
     if (depthProcessor) {
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
+
+            merge_successful = registrator.mergePCD(pcd); //merge current pcd with previous data
 
 #if 1
             std::cout << "[PCD] " << pcd.size() << std::endl;
@@ -116,6 +124,10 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
             }
             viewer.data().add_points(points,
                                      lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
+
+            registrator.getReconstructedPCD__EigenFormat(ReconstructedPCD);
+            viewer.data().add_points(ReconstructedPCD,
+                                     merge_successful ? Eigen::RowVector3d(0, 0.8, 0) : Eigen::RowVector3d(0.8, 0, 0));
 
             // Set camera on first frame
             static int warm_up_frame = 5;
@@ -221,6 +233,8 @@ int main() {
             BOTH_HANDS_EDGE_COLORS.row(i * 24 + j) = HAND_COLOR[i];
         }
     }
+
+    
 
     igl::opengl::glfw::Viewer viewer;
     viewer.callback_pre_draw = callBackPerDraw;

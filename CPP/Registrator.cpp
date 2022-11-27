@@ -19,6 +19,13 @@ std::unique_ptr<PCD> Registrator::getReconstructedPCD() const {
     return std::make_unique<PCD>(pcd);
 }
 
+void Registrator::getReconstructedPCD__EigenFormat(Eigen::MatrixXd& Mat) const {
+    Mat.resize(m_pcd->points_.size(), 3);
+    for(int i = 0; i < m_pcd->points_.size(); i++) {
+        Mat.row(i) = m_pcd->points_[i].transpose();
+    }
+}
+
 Eigen::Matrix4d Registrator::getTransformation(const geometry::PointCloud& source,
     const geometry::PointCloud& target, Eigen::Matrix6d& InfoMat, 
     const double kernel_param) {

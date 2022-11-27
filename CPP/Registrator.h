@@ -39,6 +39,13 @@ public:
     std::unique_ptr<PCD> getReconstructedPCD() const;
 
     /**
+     * @brief Same as getReconstructedPCD() but as a MatrixXd.
+     * Used for local testing with libigl
+     * @return The point cloud reconstructed so far as an Eigen Matrix
+     */
+    void getReconstructedPCD__EigenFormat(Eigen::MatrixXd& Mat) const;
+
+    /**
      * @brief Construct a mesh from the point cloud and save it to disk
      * @param save_path path to which the mesh should be saved
      */
