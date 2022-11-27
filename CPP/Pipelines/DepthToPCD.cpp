@@ -46,6 +46,11 @@ public:
             return false;
         }
     }
+
+    bool sendReconstructedPCD(const PCD& pcd) const override {
+        //TODO implement (probably not necessary actually since we are already visualizing locally)
+        return false;
+    }
 };
 
 Registrator registrator;
@@ -103,7 +108,8 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
 
-            merge_successful = registrator.mergePCD(pcd); //merge current pcd with previous data
+            //merge current pcd with previous data
+            merge_successful = registrator.mergePCD(pcd);
 
 #if 1
             std::cout << "[PCD] " << pcd.size() << std::endl;
@@ -125,9 +131,13 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
             viewer.data().add_points(points,
                                      lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
 
+            //Display Registration
             registrator.getReconstructedPCD__EigenFormat(ReconstructedPCD);
             viewer.data().add_points(ReconstructedPCD,
                                      merge_successful ? Eigen::RowVector3d(0, 0.8, 0) : Eigen::RowVector3d(0.8, 0, 0));
+            //Send merged point cloud
+            if(depthProcessor)
+                depthProcessor->sendReconstructedPCD(*registrator.getReconstructedPCD());
 
             // Set camera on first frame
             static int warm_up_frame = 5;

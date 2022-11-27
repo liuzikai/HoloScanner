@@ -14,4 +14,12 @@ class PCDSource {
 public:
 
     virtual bool getNextPCD(timestamp_t &timestamp, PCD &pcd) = 0;
+
+    /**
+     * @brief Send back the reconstructed PCD to the device
+     * 
+     * @param pcd the reconstructed PCD
+     * @return true if successfully sent
+     */
+    virtual bool sendReconstructedPCD(const PCD& pcd) const = 0;
 };

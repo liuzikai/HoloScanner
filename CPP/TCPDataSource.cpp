@@ -30,6 +30,12 @@ TCPDataSource::~TCPDataSource() {
     if (tcpIOThread) tcpIOThread->join();
 }
 
+bool TCPDataSource::sendReconstructedPCD(const PCD& pcd) const {
+    //TODO implement sending back to the Hololens
+    //socketServer.sendBytes(...);
+    return false;
+}
+
 bool TCPDataSource::getAHATExtrinsics(DirectX::XMMATRIX &extrinsics) {
     std::lock_guard<std::mutex> lock(ahatStaticDataMutex);
     if (!ahatExtrinsicsValid) return false;
