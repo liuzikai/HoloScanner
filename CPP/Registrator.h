@@ -11,6 +11,7 @@
 #include <PCDDataTypes.h>
 
 //using PCD = std::vector<Eigen::Vector3d>; //Note: Open3D requires Vector3d, not Vector3f
+#define USE_DBSCAN
 
 class Registrator {
 public:

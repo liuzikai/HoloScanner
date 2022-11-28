@@ -77,16 +77,38 @@ bool Registrator::mergePCD(const PCD& pcd_) {
     }
 
     //DBSCAN
-    bool dbscan = false; //Note: DBSCAN is too slow for real-time (could be use) for a final pass though
-    if(dbscan) {
-        std::vector<int> indices = pcd.ClusterDBSCAN(0.1, 0.7 * pcd.points_.size());
-        PCD valid_points;
-        for(int i = 0; i < indices.size(); i++) {
-            if(indices[i] != -1)
-                valid_points.push_back(pcd.points_[i]);
-        }
-        pcd.points_ = valid_points;
+    // bool dbscan = false; //Note: DBSCAN is too slow for real-time (could be use) for a final pass though
+    // if(dbscan) {
+    //     std::vector<int> indices = pcd.ClusterDBSCAN(0.1, 0.7 * pcd.points_.size());
+    //     PCD valid_points;
+    //     for(int i = 0; i < indices.size(); i++) {
+    //         if(indices[i] != -1)
+    //             valid_points.push_back(pcd.points_[i]);
+    //     }
+    //     pcd.points_ = valid_points;
+    //}
+#ifdef USE_DBSCAN
+    std::vector<size_t> index   = std::get<1>(pcd.RemoveStatisticalOutliers(16,0.8));
+    pcd                         = *pcd.SelectByIndex(index).get();
+    std::vector<int> labels     = pcd.ClusterDBSCAN(0.013, 64);
+    std::set<int> labels_unique;
+    for(int i=0; i<labels.size(); ++i){
+        labels_unique.insert(labels[i]);
     }
+    std::vector<size_t> labels_num(labels_unique.size()-1, 0);
+    std::vector<std::vector<size_t>> labels_index;
+    for(int i=0; i<labels_unique.size()-1; ++i){
+        labels_index.push_back(std::vector<size_t>());
+    }
+    for(size_t i=0; i<labels.size(); ++i){
+        if(labels[i] > 0){
+            labels_num[labels[i]] ++;
+            labels_index[labels[i]].push_back(i);
+        }
+    }
+    size_t argmax              = std::distance(labels_num.begin(), std::max_element(labels_num.begin(), labels_num.end()));
+    pcd                        = *pcd.SelectByIndex(labels_index[argmax]).get();
+#endif
     
     //Compute the transformation between the current and global point cloud
     Eigen::Matrix6d InfoMat;
