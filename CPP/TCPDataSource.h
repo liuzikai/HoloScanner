@@ -24,7 +24,7 @@ public:
 
     bool getNextPCD(timestamp_t &timestamp, PCD &pcd) override;
 
-    bool sendReconstructedPCD(const PCD& pcd) const override;
+    bool sendReconstructedPCD(const PCD& pcd) override;
 
 private:
 

@@ -30,7 +30,7 @@ TCPDataSource::~TCPDataSource() {
     if (tcpIOThread) tcpIOThread->join();
 }
 
-bool TCPDataSource::sendReconstructedPCD(const PCD& pcd) const {
+bool TCPDataSource::sendReconstructedPCD(const PCD& pcd) {
     //TODO implement sending back to the Hololens
     //socketServer.sendBytes(...);
     return false;

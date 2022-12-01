@@ -8,7 +8,7 @@
 #include <vector>
 #include <Eigen/Eigen>
 
-using PCD = std::vector<Eigen::Vector3d>;  // point cloud data
+using PCD = std::vector<Eigen::Vector3d>;  // point cloud data (Open3D use Vector3d not Vector3f)
 
 class PCDSource {
 public:
@@ -21,5 +21,5 @@ public:
      * @param pcd the reconstructed PCD
      * @return true if successfully sent
      */
-    virtual bool sendReconstructedPCD(const PCD& pcd) const = 0;
+    virtual bool sendReconstructedPCD(const PCD& pcd) = 0;
 };

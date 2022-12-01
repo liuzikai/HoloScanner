@@ -47,7 +47,7 @@ public:
         }
     }
 
-    bool sendReconstructedPCD(const PCD& pcd) const override {
+    bool sendReconstructedPCD(const PCD& pcd) override {
         //TODO implement (probably not necessary actually since we are already visualizing locally)
         return false;
     }
@@ -124,27 +124,30 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
         // PCD
         {
-            Eigen::MatrixXd points(pcd.size(), 3);
-            for (int i = 0; i < pcd.size(); i++) {
-                points.row(i) = pcd[i].cast<double>();
-            }
-            viewer.data().add_points(points,
-                                     lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
+//            Eigen::MatrixXd points(pcd.size(), 3);
+//            for (int i = 0; i < pcd.size(); i++) {
+//                points.row(i) = pcd[i].cast<double>();
+//            }
+//            viewer.data().add_points(points,
+//                                     lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
 
             //Display Registration
-            registrator.getReconstructedPCD__EigenFormat(ReconstructedPCD);
-            viewer.data().add_points(ReconstructedPCD,
-                                     merge_successful ? Eigen::RowVector3d(0, 0.8, 0) : Eigen::RowVector3d(0.8, 0, 0));
-            //Send merged point cloud
-            if(depthProcessor)
-                depthProcessor->sendReconstructedPCD(*registrator.getReconstructedPCD());
+            if (registrator.getReconstructedPCDInEigenFormat(ReconstructedPCD)) {
+                std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = " << merge_successful << std::endl;
+                viewer.data().add_points(ReconstructedPCD,
+                                         merge_successful ? Eigen::RowVector3d(0, 0.8, 0) : Eigen::RowVector3d(0.8, 0,
+                                                                                                               0));
+                //Send merged point cloud
+                if (depthProcessor)
+                    depthProcessor->sendReconstructedPCD(*registrator.getReconstructedPCD());
+            }
 
             // Set camera on first frame
             static int warm_up_frame = 5;
             if (warm_up_frame > 0 && pcd.size() > 200) {
                 warm_up_frame--;
                 if (warm_up_frame == 0) {
-                    viewer.core().align_camera_center(points);
+                    viewer.core().align_camera_center(ReconstructedPCD);
                 }
             }
         }
