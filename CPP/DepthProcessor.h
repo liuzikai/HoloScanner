@@ -39,7 +39,7 @@ public:
     size_t stdLogIndex = 0;
     static constexpr size_t STD_LOG_SIZE = 10;
 
-    static constexpr float MAX_STD_VAL = 15000.0f; // squared value on purpose
+    static constexpr float MAX_STD_VAL = 14500.0f; // squared value on purpose
 
 
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;
@@ -65,7 +65,7 @@ public:
     };
     // @formatter:on
 
-    static constexpr float WRIST_RADIUS = 0.05f;
+    static constexpr float WRIST_RADIUS = 0.1f;
 
     // Normals
     static constexpr float FINGER_RADIUS = 0.025f;
@@ -78,27 +78,27 @@ public:
             0.05,   /* ThumbMetacarpal */
             0.04,   /* ThumbProximal */
             0.03,   /* ThumbDistal */
-            0.02,   /* ThumbTip */
+            0.025,  /* ThumbTip */
             0.04,   /* IndexMetacarpal */
             0.03,   /* IndexProximal */
             0.02,   /* IndexIntermediate */
             0.02,   /* IndexDistal */
-            0.01,   /* IndexTip */
+            0.015,  /* IndexTip */
             0.04,   /* MiddleMetacarpal */
             0.02,   /* MiddleProximal */
             0.02,   /* MiddleIntermediate */
             0.02,   /* MiddleDistal */
-            0.01,   /* MiddleTip */
+            0.015,  /* MiddleTip */
             0.04,   /* RingMetacarpal */
             0.02,   /* RingProximal */
             0.02,   /* RingIntermediate */
             0.02,   /* RingDistal */
-            0.01,   /* RingTip */
+            0.015,  /* RingTip */
             0.04,   /* PinkyMetacarpal */
             0.02,   /* PinkyProximal */
             0.02,   /* PinkyIntermediate */
             0.02,   /* PinkyDistal */
-            0.01,   /* PinkyTip */
+            0.015,  /* PinkyTip */
     };
     static_assert(sizeof(DepthProcessor::FINGER_SIZES) == HandJointIndexCount * sizeof(float), "FINGER_SIZES");
 
