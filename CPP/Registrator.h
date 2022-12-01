@@ -10,7 +10,7 @@
 #include <open3d/geometry/PointCloud.h>
 #include <PCDDataTypes.h>
 
-//#define USE_DBSCAN
+#define USE_DBSCAN
 
 class Registrator {
 public:

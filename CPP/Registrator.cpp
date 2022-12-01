@@ -72,7 +72,7 @@ bool Registrator::isRegistrationSuccessful(const geometry::PointCloud &pcd, cons
 }
 
 bool Registrator::mergePCD(const PCD &pcd_) {
-    if (pcd_.size() < 500) return false;
+    if (pcd_.size() < 2000) return false;
     auto pcd = geometry::PointCloud(pcd_);
     if (m_pcd == nullptr) { //First registration is always successful as it initializes the point cloud
         m_pcd = std::make_shared<geometry::PointCloud>(pcd);
@@ -96,15 +96,17 @@ bool Registrator::mergePCD(const PCD &pcd_) {
     std::vector<int> labels = pcd.ClusterDBSCAN(0.013, 64);
     std::set<int> labels_unique;
     for (int i = 0; i < labels.size(); ++i) {
-        labels_unique.insert(labels[i]);
+        if (labels[i] >= 0) {
+            labels_unique.insert(labels[i]);
+        }
     }
-    std::vector<size_t> labels_num(labels_unique.size() - 1, 0);
+    std::vector<size_t> labels_num(labels_unique.size(), 0);
     std::vector<std::vector<size_t>> labels_index;
-    for (int i = 0; i < labels_unique.size() - 1; ++i) {
+    for (int i = 0; i < labels_unique.size(); ++i) {
         labels_index.push_back(std::vector<size_t>());
     }
     for (size_t i = 0; i < labels.size(); ++i) {
-        if (labels[i] > 0) {
+        if (labels[i] >= 0) {
             labels_num[labels[i]]++;
             labels_index[labels[i]].push_back(i);
         }
