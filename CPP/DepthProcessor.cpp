@@ -41,12 +41,201 @@ bool DepthProcessor::getNextPCDRaw(timestamp_t &timestamp, PCDRaw &pcdRaw) {
     return true;
 }
 
-bool DepthProcessor::updateHandMesh(const Hand &hand, std::vector<DirectX::XMVECTOR> &mesh,
-                                    std::vector<float> &filterDistanceSq) {
-    if (!hand.strictlyTracked) return false;
+bool DepthProcessor::getNextHandDebugFrame(timestamp_t &timestamp, HandDebugFrame &hdFrame) {
+    std::lock_guard<std::mutex> lock(pcdMutex);
+    if (handMeshDebugQueue.empty()) return false;
 
-    mesh.clear();
-    filterDistanceSq.clear();
+    hdFrame = std::move(handMeshDebugQueue.front());
+    timestamp = hdFrame.timestamp;
+    handMeshDebugQueue.pop();
+    return true;
+}
+
+void DepthProcessor::wristNormals(
+        const DirectX::XMVECTOR &wrist,
+        const DirectX::XMVECTOR &palm,
+        const DirectX::XMVECTOR &indexMetacarpal,
+        const DirectX::XMVECTOR &pinkyMetacarpal,
+        float dist,
+        bool isRightHand,
+        DirectX::XMVECTOR &nDir,
+        DirectX::XMVECTOR &nTDir,
+        std::vector<DirectX::XMVECTOR> &vertices,
+        std::vector<std::vector<int>> &indices,
+        std::vector<float> &filterDistanceSq
+) {
+    DirectX::XMVECTOR temp = wrist - palm;
+    DirectX::XMVECTOR backSide_1 = wrist + 1.0f * temp;
+    DirectX::XMVECTOR backSide_2 = wrist + 2.0f * temp;
+    DirectX::XMVECTOR backSide_3 = wrist + 3.0f * temp;
+
+    DirectX::XMVECTOR dirIndexMetacarpal = indexMetacarpal - wrist;
+    DirectX::XMVECTOR dirPinkyMetacarpal = pinkyMetacarpal - wrist;
+
+    if (isRightHand) {
+        nDir = DirectX::XMVector3Cross(dirPinkyMetacarpal, dirIndexMetacarpal);
+    } else {
+        nDir = DirectX::XMVector3Cross(dirIndexMetacarpal, dirPinkyMetacarpal);
+    }
+    nDir = DirectX::XMVector3Normalize(nDir);
+    nTDir = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(nDir, temp));
+
+    size_t startS = vertices.size();
+    vertices.push_back(wrist);
+    vertices.push_back(palm);
+    vertices.push_back(backSide_1);
+    vertices.push_back(backSide_2);
+    vertices.push_back(backSide_3);
+    vertices.push_back(wrist + dist * nDir);
+    vertices.push_back(wrist - dist * nDir);
+    vertices.push_back(wrist + dist * nTDir);
+    vertices.push_back(wrist - dist * nTDir);
+    vertices.push_back(backSide_1 + dist * nDir);
+    vertices.push_back(backSide_1 - dist * nDir);
+    vertices.push_back(backSide_1 + dist * nTDir);
+    vertices.push_back(backSide_1 - dist * nTDir);
+    vertices.push_back(backSide_2 + dist * nDir);
+    vertices.push_back(backSide_2 - dist * nDir);
+    vertices.push_back(backSide_2 + dist * nTDir);
+    vertices.push_back(backSide_2 - dist * nTDir);
+    vertices.push_back(backSide_3 + dist * nDir);
+    vertices.push_back(backSide_3 - dist * nDir);
+    vertices.push_back(backSide_3 + dist * nTDir);
+    vertices.push_back(backSide_3 - dist * nTDir);
+    vertices.push_back(palm + dist * nDir);
+    size_t endS = vertices.size();
+
+    // add the squared distance for each new vertex
+    float sqDistance = dist * dist;
+    for (auto i = startS; i < endS; ++i) {
+        filterDistanceSq.push_back(sqDistance);
+    }
+
+    int offset = static_cast<int>(startS);
+    indices.push_back({0 + offset, 2 + offset});
+    indices.push_back({2 + offset, 3 + offset});
+    indices.push_back({3 + offset, 4 + offset});
+    indices.push_back({0 + offset, 5 + offset});
+    indices.push_back({0 + offset, 6 + offset});
+    indices.push_back({0 + offset, 7 + offset});
+    indices.push_back({0 + offset, 8 + offset});
+    indices.push_back({2 + offset, 9 + offset});
+    indices.push_back({2 + offset, 10 + offset});
+    indices.push_back({2 + offset, 11 + offset});
+    indices.push_back({2 + offset, 12 + offset});
+    indices.push_back({3 + offset, 13 + offset});
+    indices.push_back({3 + offset, 14 + offset});
+    indices.push_back({3 + offset, 15 + offset});
+    indices.push_back({3 + offset, 16 + offset});
+    indices.push_back({4 + offset, 17 + offset});
+    indices.push_back({4 + offset, 18 + offset});
+    indices.push_back({4 + offset, 19 + offset});
+    indices.push_back({4 + offset, 20 + offset});
+    indices.push_back({1 + offset, 21 + offset});
+}
+
+void DepthProcessor::fingerNormals(
+        const DirectX::XMVECTOR &tip,
+        const DirectX::XMVECTOR &distal,
+        const DirectX::XMVECTOR &intermediate,
+        const DirectX::XMVECTOR &proximal,
+        const DirectX::XMVECTOR &nDir,
+        const DirectX::XMVECTOR &nTDir,
+        float dist,
+        bool flip,
+        bool indexOrPinky,
+        std::vector<DirectX::XMVECTOR> &vertices,
+        std::vector<std::vector<int>> &indices,
+        std::vector<float> &filterDistanceSq
+) {
+    DirectX::XMVECTOR dirTip = tip - distal;
+    dirTip = DirectX::XMVector3Normalize(dirTip);
+    DirectX::XMVECTOR dirDistal = distal - intermediate;
+    dirDistal = DirectX::XMVector3Normalize(dirDistal);
+    DirectX::XMVECTOR dirIntermediate = intermediate - proximal;
+    dirIntermediate = DirectX::XMVector3Normalize(dirIntermediate);
+
+    DirectX::XMVECTOR nTip = DirectX::XMVector3Cross(nTDir, dirTip);
+    DirectX::XMVECTOR nDistal = DirectX::XMVector3Cross(nTDir, dirDistal);
+    DirectX::XMVECTOR nIntermediate = DirectX::XMVector3Cross(nTDir, dirIntermediate);
+
+    size_t startS = vertices.size();
+    vertices.push_back(distal);
+    vertices.push_back(intermediate);
+    vertices.push_back(proximal);
+    vertices.push_back(distal + dist * nDistal);
+    vertices.push_back(intermediate + dist * nIntermediate);
+    vertices.push_back(proximal + dist * nDir);
+
+    int offset = static_cast<int>(startS);
+    indices.push_back({0 + offset, 3 + offset});
+    indices.push_back({1 + offset, 4 + offset});
+    indices.push_back({2 + offset, 5 + offset});
+
+    if (indexOrPinky) {
+        if (flip) {
+            dist = -dist;
+        }
+
+        vertices.push_back(distal + dist * nTDir);
+        vertices.push_back(intermediate + dist * nTDir);
+        vertices.push_back(proximal + dist * nTDir);
+
+        indices.push_back({0 + offset, 6 + offset});
+        indices.push_back({1 + offset, 7 + offset});
+        indices.push_back({2 + offset, 8 + offset});
+    }
+
+    size_t endS = vertices.size();
+
+    // add the squared distance for each new vertex
+    float sqDistance = dist * dist;
+    for (auto i = startS; i < endS; ++i) {
+        filterDistanceSq.push_back(sqDistance);
+    }
+}
+
+void DepthProcessor::thumbNormals(
+        const DirectX::XMVECTOR &tip,
+        const DirectX::XMVECTOR &distal,
+        const DirectX::XMVECTOR &proximal,
+        const DirectX::XMVECTOR &nTDir,
+        float dist,
+        bool isRightHand,
+        std::vector<DirectX::XMVECTOR> &vertices,
+        std::vector<std::vector<int>> &indices,
+        std::vector<float> &filterDistanceSq
+) {
+    if (isRightHand) {
+        dist = -dist;
+    }
+
+    size_t startS = vertices.size();
+    vertices.push_back(distal);
+    vertices.push_back(proximal);
+    vertices.push_back(distal + dist * nTDir);
+    vertices.push_back(proximal + dist * nTDir);
+
+    int offset = static_cast<int>(startS);
+    indices.push_back({0 + offset, 2 + offset});
+    indices.push_back({1 + offset, 3 + offset});
+
+    size_t endS = vertices.size();
+
+    // add the squared distance for each new vertex
+    float sqDistance = dist * dist;
+    for (auto i = startS; i < endS; ++i) {
+        filterDistanceSq.push_back(sqDistance);
+    }
+}
+
+void DepthProcessor::updateHandMesh(
+        const Hand &hand,
+        std::vector<DirectX::XMVECTOR> &vertices,
+        std::vector<std::vector<int>> &indices,
+        std::vector<float> &filterDistanceSq
+) {
+    if (!hand.strictlyTracked) return;
 
     for (const auto &b: HAND_BONES) {
         const float d1 = FINGER_SIZES[b[0]];
@@ -71,20 +260,23 @@ bool DepthProcessor::updateHandMesh(const Hand &hand, std::vector<DirectX::XMVEC
         int sCount = static_cast<int>(segmentCount);
         for (int s = 0; s <= sCount; ++s) {
             float x = (float) s * delta;
-            mesh.push_back(origin + x * boneDirection);
+            vertices.push_back(origin + x * boneDirection);
+            if (s != 0) {
+                indices.push_back({static_cast<int>(vertices.size()) - 2, static_cast<int>(vertices.size()) - 1});
+            }
             float percent = 1.0f / boneLength * x;
             filterDistanceSq.push_back(pow2(d1 * (1.0f - percent) + d2 * percent));
         }
     }
-
-    return true;
 }
 
 bool DepthProcessor::inHandMesh(const XMVECTOR &point) {
     for (int h = 0; h < HandIndexCount; h++) {
-        for (int i = 0; i < handMesh[h].size(); i++) {
+        size_t size = handMesh[h].size();
+        for (int i = 0; i < size; i++) {
             float distSq = XMVectorGetX(XMVector3LengthSq(point - handMesh[h][i]));
-            if (distSq < handFilterDistanceSq[h][i]) return true;}
+            if (distSq < handFilterDistanceSq[h][i]) return true;
+        }
     }
     return false;
 }
@@ -94,8 +286,157 @@ bool DepthProcessor::update(const RawDataFrame &input) {
         return false;  // tell the user of dropping frame
     }
 
-    updateHandMesh(input.hands[Left], handMesh[Left], handFilterDistanceSq[Left]);
-    updateHandMesh(input.hands[Right], handMesh[Right], handFilterDistanceSq[Right]);
+    handMesh[Left].clear();
+    handMesh[Right].clear();
+    handMeshIndices[Left].clear();
+    handMeshIndices[Right].clear();
+    handFilterDistanceSq[Left].clear();
+    handFilterDistanceSq[Right].clear();
+
+    updateHandMesh(input.hands[Left], handMesh[Left], handMeshIndices[Left], handFilterDistanceSq[Left]);
+    updateHandMesh(input.hands[Right], handMesh[Right], handMeshIndices[Right], handFilterDistanceSq[Right]);
+
+    // normal vectors on left and right wrists
+    DirectX::XMVECTOR lnDir;
+    DirectX::XMVECTOR lnTDir;
+    DirectX::XMVECTOR rnDir;
+    DirectX::XMVECTOR rnTDir;
+    const HandJoint *lhJoints = input.hands[HandIndex::Left].joints;
+    const HandJoint *rhJoints = input.hands[HandIndex::Right].joints;
+
+    if (input.hands[Left].strictlyTracked) {
+        // left wrist
+        wristNormals(
+                lhJoints[HandJointIndex::Wrist].translationInRig,
+                lhJoints[HandJointIndex::Palm].translationInRig,
+                lhJoints[HandJointIndex::IndexMetacarpal].translationInRig,
+                lhJoints[HandJointIndex::PinkyMetacarpal].translationInRig,
+                WRIST_RADIUS, false, lnDir, lnTDir, handMesh[Left], handMeshIndices[Left],
+                handFilterDistanceSq[Left]
+        );
+
+        // left index finger
+        fingerNormals(
+                lhJoints[HandJointIndex::IndexTip].translationInRig,
+                lhJoints[HandJointIndex::IndexDistal].translationInRig,
+                lhJoints[HandJointIndex::IndexIntermediate].translationInRig,
+                lhJoints[HandJointIndex::IndexProximal].translationInRig,
+                lnDir, lnTDir, INDEX_RADIUS, false, true,
+                handMesh[Left], handMeshIndices[Left],
+                handFilterDistanceSq[Left]
+        );
+
+        // left middle finger
+        fingerNormals(
+                lhJoints[HandJointIndex::MiddleTip].translationInRig,
+                lhJoints[HandJointIndex::MiddleDistal].translationInRig,
+                lhJoints[HandJointIndex::MiddleIntermediate].translationInRig,
+                lhJoints[HandJointIndex::MiddleProximal].translationInRig,
+                lnDir, lnTDir, FINGER_RADIUS, false, false,
+                handMesh[Left], handMeshIndices[Left],
+                handFilterDistanceSq[Left]
+        );
+
+        // left ring finger
+        fingerNormals(
+                lhJoints[HandJointIndex::RingTip].translationInRig,
+                lhJoints[HandJointIndex::RingDistal].translationInRig,
+                lhJoints[HandJointIndex::RingIntermediate].translationInRig,
+                lhJoints[HandJointIndex::RingProximal].translationInRig,
+                lnDir, lnTDir, FINGER_RADIUS, false, false,
+                handMesh[Left], handMeshIndices[Left],
+                handFilterDistanceSq[Left]
+        );
+
+        // left pinky finger
+        fingerNormals(
+                lhJoints[HandJointIndex::PinkyTip].translationInRig,
+                lhJoints[HandJointIndex::PinkyDistal].translationInRig,
+                lhJoints[HandJointIndex::PinkyIntermediate].translationInRig,
+                lhJoints[HandJointIndex::PinkyProximal].translationInRig,
+                lnDir, lnTDir, FINGER_RADIUS, true, true,
+                handMesh[Left], handMeshIndices[Left],
+                handFilterDistanceSq[Left]
+        );
+
+        // left thumb
+        thumbNormals(
+                lhJoints[HandJointIndex::ThumbTip].translationInRig,
+                lhJoints[HandJointIndex::ThumbDistal].translationInRig,
+                lhJoints[HandJointIndex::ThumbProximal].translationInRig,
+                lnTDir, THUMB_RADIUS, false,
+                handMesh[Left], handMeshIndices[Left],
+                handFilterDistanceSq[Left]
+        );
+    }
+
+    if (input.hands[Right].strictlyTracked) {
+        // right wrist
+        wristNormals(
+                rhJoints[HandJointIndex::Wrist].translationInRig,
+                rhJoints[HandJointIndex::Palm].translationInRig,
+                rhJoints[HandJointIndex::IndexMetacarpal].translationInRig,
+                rhJoints[HandJointIndex::PinkyMetacarpal].translationInRig,
+                WRIST_RADIUS, true, rnDir, rnTDir, handMesh[Right], handMeshIndices[Right],
+                handFilterDistanceSq[Right]
+        );
+
+        // right index finger
+        fingerNormals(
+                rhJoints[HandJointIndex::IndexTip].translationInRig,
+                rhJoints[HandJointIndex::IndexDistal].translationInRig,
+                rhJoints[HandJointIndex::IndexIntermediate].translationInRig,
+                rhJoints[HandJointIndex::IndexProximal].translationInRig,
+                rnDir, rnTDir, INDEX_RADIUS, true, true,
+                handMesh[Right], handMeshIndices[Right],
+                handFilterDistanceSq[Right]
+        );
+
+        // right middle finger
+        fingerNormals(
+                rhJoints[HandJointIndex::MiddleTip].translationInRig,
+                rhJoints[HandJointIndex::MiddleDistal].translationInRig,
+                rhJoints[HandJointIndex::MiddleIntermediate].translationInRig,
+                rhJoints[HandJointIndex::MiddleProximal].translationInRig,
+                rnDir, rnTDir, FINGER_RADIUS, true, false,
+                handMesh[Right], handMeshIndices[Right],
+                handFilterDistanceSq[Right]
+        );
+
+        // right ring finger
+        fingerNormals(
+                rhJoints[HandJointIndex::RingTip].translationInRig,
+                rhJoints[HandJointIndex::RingDistal].translationInRig,
+                rhJoints[HandJointIndex::RingIntermediate].translationInRig,
+                rhJoints[HandJointIndex::RingProximal].translationInRig,
+                rnDir, rnTDir, FINGER_RADIUS, true, false,
+                handMesh[Right], handMeshIndices[Right],
+                handFilterDistanceSq[Right]
+        );
+
+        // right pinky finger
+        fingerNormals(
+                rhJoints[HandJointIndex::PinkyTip].translationInRig,
+                rhJoints[HandJointIndex::PinkyDistal].translationInRig,
+                rhJoints[HandJointIndex::PinkyIntermediate].translationInRig,
+                rhJoints[HandJointIndex::PinkyProximal].translationInRig,
+                rnDir, rnTDir, FINGER_RADIUS, false, true,
+                handMesh[Right], handMeshIndices[Right],
+                handFilterDistanceSq[Right]
+        );
+
+        // right thumb
+        thumbNormals(
+                rhJoints[HandJointIndex::ThumbTip].translationInRig,
+                rhJoints[HandJointIndex::ThumbDistal].translationInRig,
+                rhJoints[HandJointIndex::ThumbProximal].translationInRig,
+                rnTDir, THUMB_RADIUS, true,
+                handMesh[Right], handMeshIndices[Right],
+                handFilterDistanceSq[Right]
+        );
+    }
+
+    //input.hands[HandIndex::Left].joints[HandJointIndex::Wrist].translationInRig
 
     std::pair<timestamp_t, PCDRaw> frame;
     frame.first = input.timestamp;
@@ -169,6 +510,18 @@ bool DepthProcessor::update(const RawDataFrame &input) {
     {
         std::lock_guard<std::mutex> lock(pcdMutex);
         pcdRawFrames.emplace(std::move(frame));
+        auto mPair = std::make_pair(frame.first, handMesh);
+        auto iPair = std::make_pair(frame.first, handMeshIndices);
+
+        // not sure about all the moves here...
+        HandDebugFrame hdFrame;
+        hdFrame.timestamp = frame.first;
+        hdFrame.lhMesh = std::move(handMesh[Left]);
+        hdFrame.lhIndices = std::move(handMeshIndices[Left]);
+        hdFrame.rhMesh = std::move(handMesh[Right]);
+        hdFrame.rhIndices = std::move(handMeshIndices[Right]);
+
+        handMeshDebugQueue.emplace(std::move(hdFrame));
     }
 
     return true;
