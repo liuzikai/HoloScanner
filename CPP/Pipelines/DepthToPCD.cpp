@@ -148,7 +148,38 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         bool rightTracked = rawDataFrame.hands[Right].strictlyTracked;
 
         if (!lostTracking && hasDebugHand) {
-            if (leftTracked) {
+
+            // TODO: clean up the duplicate code
+            if (leftTracked && rightTracked) {
+                int lhvSize = static_cast<int>(debugHandFrame.lhMesh.size());
+                int lhiSize = static_cast<int>(debugHandFrame.lhIndices.size());
+                int rhvSize = static_cast<int>(debugHandFrame.rhMesh.size());
+                int rhiSize = static_cast<int>(debugHandFrame.rhIndices.size());
+                Eigen::MatrixXd jointPoints(lhvSize + rhvSize, 3);
+                Eigen::MatrixXi jointIndices(lhiSize + rhiSize, 2);
+                Eigen::MatrixXd colors(lhiSize + rhiSize, 3);
+
+                for (int j = 0; j < lhvSize; j++) {
+                    jointPoints.row(j) = XMVectorToEigenVector3d(debugHandFrame.lhMesh[j]);
+                }
+                for (int j = 0; j < rhvSize; j++) {
+                    jointPoints.row(j + lhvSize) = XMVectorToEigenVector3d(debugHandFrame.rhMesh[j]);
+                }
+
+                for (int j = 0; j < lhiSize; j++) {
+                    jointIndices.row(j) << debugHandFrame.lhIndices[j][0], debugHandFrame.lhIndices[j][1];
+                    colors.row(j) = Eigen::RowVector3d(0, 1, 0);
+                }
+                for (int j = 0; j < rhiSize; j++) {
+                    jointIndices.row(j + lhiSize) << debugHandFrame.rhIndices[j][0] + lhvSize,
+                            debugHandFrame.rhIndices[j][1] + lhvSize;
+                    colors.row(j + lhiSize) = Eigen::RowVector3d(1, 0, 0);
+                }
+
+                viewer.data().set_edges(jointPoints, jointIndices, colors);
+
+            } else if (leftTracked) {
+
                 int lhvSize = static_cast<int>(debugHandFrame.lhMesh.size());
                 int lhiSize = static_cast<int>(debugHandFrame.lhIndices.size());
                 Eigen::MatrixXd jointPoints(lhvSize, 3);
@@ -163,17 +194,17 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                 }
 
                 viewer.data().set_edges(jointPoints, jointIndices, Eigen::RowVector3d(0, 1, 0));
-            }
 
-            if (rightTracked) {
+            } else if (rightTracked) {
+
                 int rhvSize = static_cast<int>(debugHandFrame.rhMesh.size());
                 int rhiSize = static_cast<int>(debugHandFrame.rhIndices.size());
                 Eigen::MatrixXd jointPoints(rhvSize, 3);
                 Eigen::MatrixXi jointIndices(rhiSize, 2);
 
-                    for (int j = 0; j < rhvSize; j++) {
-                        jointPoints.row(j) = XMVectorToEigenVector3d(debugHandFrame.rhMesh[j]);
-                    }
+                for (int j = 0; j < rhvSize; j++) {
+                    jointPoints.row(j) = XMVectorToEigenVector3d(debugHandFrame.rhMesh[j]);
+                }
 
                 for (int j = 0; j < rhiSize; j++) {
                     jointIndices.row(j) << debugHandFrame.rhIndices[j][0], debugHandFrame.rhIndices[j][1];

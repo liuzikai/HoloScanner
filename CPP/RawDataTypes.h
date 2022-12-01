@@ -82,6 +82,9 @@ struct RawDataFrame {
     DirectX::XMVECTOR eyeDirection;  // world coordinate
 };
 
+using Mesh = std::vector<DirectX::XMVECTOR>;
+using Indices = std::vector<std::vector<int>>;
+
 struct HandDebugFrame {
     timestamp_t timestamp;
     Mesh lhMesh;
@@ -126,5 +129,3 @@ protected:
 };
 
 using PCDRaw = std::vector<float>;
-using Mesh = std::vector<DirectX::XMVECTOR>;
-using Indices = std::vector<std::vector<int>>;

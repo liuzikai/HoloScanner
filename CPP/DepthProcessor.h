@@ -19,7 +19,7 @@ public:
 
     bool getNextPCDRaw(timestamp_t &timestamp, PCDRaw &pcdRaw);
 
-    bool getNextHandDebugFrame(timestamp_t& timestamp, HandDebugFrame& hdFrame);
+    bool getNextHandDebugFrame(timestamp_t &timestamp, HandDebugFrame &hdFrame);
 
 public:
 
@@ -66,59 +66,88 @@ public:
     // @formatter:on
 
     static constexpr float WRIST_RADIUS = 0.05f;
+
+    // Normals
     static constexpr float FINGER_RADIUS = 0.025f;
+    static constexpr float THUMB_RADIUS = 0.04f;
+    static constexpr float INDEX_RADIUS = 0.03f;
+
     static constexpr float FINGER_SIZES[HandJointIndexCount] = {
-            WRIST_RADIUS, WRIST_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS,
-            FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS,
-            FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS,
-            FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS, FINGER_RADIUS,
+            0.05,   /* PALM */
+            0.05,   /* WRIST */
+            0.05,   /* ThumbMetacarpal */
+            0.04,   /* ThumbProximal */
+            0.03,   /* ThumbDistal */
+            0.02,   /* ThumbTip */
+            0.04,   /* IndexMetacarpal */
+            0.03,   /* IndexProximal */
+            0.02,   /* IndexIntermediate */
+            0.02,   /* IndexDistal */
+            0.01,   /* IndexTip */
+            0.04,   /* MiddleMetacarpal */
+            0.02,   /* MiddleProximal */
+            0.02,   /* MiddleIntermediate */
+            0.02,   /* MiddleDistal */
+            0.01,   /* MiddleTip */
+            0.04,   /* RingMetacarpal */
+            0.02,   /* RingProximal */
+            0.02,   /* RingIntermediate */
+            0.02,   /* RingDistal */
+            0.01,   /* RingTip */
+            0.04,   /* PinkyMetacarpal */
+            0.02,   /* PinkyProximal */
+            0.02,   /* PinkyIntermediate */
+            0.02,   /* PinkyDistal */
+            0.01,   /* PinkyTip */
     };
     static_assert(sizeof(DepthProcessor::FINGER_SIZES) == HandJointIndexCount * sizeof(float), "FINGER_SIZES");
 
     void wristNormals(
-        const DirectX::XMVECTOR& wrist,
-        const DirectX::XMVECTOR& palm,
-        const DirectX::XMVECTOR& indexMetacarpal,
-        const DirectX::XMVECTOR& pinkyMetacarpal,
-        float dist,
-        bool isRightHand,
-        DirectX::XMVECTOR& nDir,
-        DirectX::XMVECTOR& nTDir,
-        std::vector<DirectX::XMVECTOR>& vertices,
-        std::vector<std::vector<int>>& indices,
-        std::vector<float>& filterDistanceSq
+            const DirectX::XMVECTOR &wrist,
+            const DirectX::XMVECTOR &palm,
+            const DirectX::XMVECTOR &indexMetacarpal,
+            const DirectX::XMVECTOR &pinkyMetacarpal,
+            float dist,
+            bool isRightHand,
+            DirectX::XMVECTOR &nDir,
+            DirectX::XMVECTOR &nTDir,
+            std::vector<DirectX::XMVECTOR> &vertices,
+            std::vector<std::vector<int>> &indices,
+            std::vector<float> &filterDistanceSq
     );
+
     void fingerNormals(
-        const DirectX::XMVECTOR& tip,
-        const DirectX::XMVECTOR& distal,
-        const DirectX::XMVECTOR& intermediate,
-        const DirectX::XMVECTOR& proximal,
-        const DirectX::XMVECTOR& nDir,
-        const DirectX::XMVECTOR& nTDir,
-        float dist,
-        bool flip,
-        bool indexOrPinky,
-        std::vector<DirectX::XMVECTOR>& vertices,
-        std::vector<std::vector<int>>& indices,
-        std::vector<float>& filterDistanceSq
+            const DirectX::XMVECTOR &tip,
+            const DirectX::XMVECTOR &distal,
+            const DirectX::XMVECTOR &intermediate,
+            const DirectX::XMVECTOR &proximal,
+            const DirectX::XMVECTOR &nDir,
+            const DirectX::XMVECTOR &nTDir,
+            float dist,
+            bool flip,
+            bool indexOrPinky,
+            std::vector<DirectX::XMVECTOR> &vertices,
+            std::vector<std::vector<int>> &indices,
+            std::vector<float> &filterDistanceSq
     );
 
     void thumbNormals(
-        const DirectX::XMVECTOR& tip,
-        const DirectX::XMVECTOR& distal,
-        const DirectX::XMVECTOR& proximal,
-        const DirectX::XMVECTOR& nTDir,
-        float dist,
-        bool isRightHand,
-        std::vector<DirectX::XMVECTOR>& vertices,
-        std::vector<std::vector<int>>& indices,
-        std::vector<float>& filterDistanceSq
+            const DirectX::XMVECTOR &tip,
+            const DirectX::XMVECTOR &distal,
+            const DirectX::XMVECTOR &proximal,
+            const DirectX::XMVECTOR &nTDir,
+            float dist,
+            bool isRightHand,
+            std::vector<DirectX::XMVECTOR> &vertices,
+            std::vector<std::vector<int>> &indices,
+            std::vector<float> &filterDistanceSq
     );
-    bool updateHandMesh(
-        const Hand &hand, 
-        std::vector<DirectX::XMVECTOR> &vertices,
-        std::vector<std::vector<int>> &indices,
-        std::vector<float> &filterDistanceSq
+
+    void updateHandMesh(
+            const Hand &hand,
+            std::vector<DirectX::XMVECTOR> &vertices,
+            std::vector<std::vector<int>> &indices,
+            std::vector<float> &filterDistanceSq
     );
 
     bool inHandMesh(const DirectX::XMVECTOR &point);

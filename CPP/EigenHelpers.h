@@ -13,3 +13,4 @@ static inline Eigen::Vector3d XMVectorToEigenVector3d(const DirectX::XMVECTOR &v
     // NOTICE: x ang y swapped and all negated
     return Eigen::Vector3d{-f.y, -f.x, -f.z} / f.w;
 }
+
