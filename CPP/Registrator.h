@@ -7,8 +7,11 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <limits>
 #include <open3d/geometry/PointCloud.h>
 #include <PCDDataTypes.h>
+#include <DirectXMath.h>
+
 
 #define USE_DBSCAN
 
@@ -30,8 +33,11 @@ public:
      * @param pcd [in] point to cloud to merge into the global point cloud
      * @return true if the merge succeeds, false otherwise
      */
-    bool mergePCD(const PCD &pcd);
-
+#ifdef USE_DBSCAN
+    bool mergePCD(const PCD &pcd, std::vector<DirectX::XMVECTOR> handMesh[2]);
+#else
+    bool mergePCD(const PCD &pcd)
+#endif
     /**
      * @brief Returns the latest reconstruction result
      * @return The point cloud reconstructed so far as a PCD type

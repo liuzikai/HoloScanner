@@ -109,7 +109,11 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
 
             //merge current pcd with previous data
+#ifdef USE_DBSCAN
+            merge_successful = registrator.mergePCD(pcd, depthProcessor->handMesh);
+#else 
             merge_successful = registrator.mergePCD(pcd);
+#endif
 
 #if 1
             std::cout << "[PCD] " << pcd.size() << std::endl;

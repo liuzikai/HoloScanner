@@ -71,7 +71,12 @@ bool Registrator::isRegistrationSuccessful(const geometry::PointCloud &pcd, cons
     return high_fitness && low_rmse;
 }
 
-bool Registrator::mergePCD(const PCD &pcd_) {
+#ifdef USE_DBSCAN
+bool Registrator::mergePCD(const PCD &pcd_, std::vector<DirectX::XMVECTOR> handMesh[2]) 
+#else 
+bool Registrator::mergePCD(const PCD &pcd_) 
+#endif
+{
     if (pcd_.size() < 2000) return false;
     auto pcd = geometry::PointCloud(pcd_);
     if (m_pcd == nullptr) { //First registration is always successful as it initializes the point cloud
@@ -100,19 +105,38 @@ bool Registrator::mergePCD(const PCD &pcd_) {
             labels_unique.insert(labels[i]);
         }
     }
+    // mean of the hand points
+    Eigen::Vector3d hand_center(0.0, 0.0, 0.0);
+    for(size_t i=0; i<2; ++i){
+        for(size_t j=0; j<handMesh[i].size(); ++j){
+            hand_center[0] -= handMesh[i][j][1];
+            hand_center[1] -= handMesh[i][j][0];
+            hand_center[2] += handMesh[i][j][2];
+        }
+    }
+
+    hand_center = hand_center / (2*handMesh[0].size());
+    // some recording for each cluster
     std::vector<size_t> labels_num(labels_unique.size(), 0);
+    std::vector<double> distances(labels_unique.size(), std::numeric_limits<double>::max());
     std::vector<std::vector<size_t>> labels_index;
     for (int i = 0; i < labels_unique.size(); ++i) {
         labels_index.push_back(std::vector<size_t>());
     }
     for (size_t i = 0; i < labels.size(); ++i) {
-        if (labels[i] >= 0) {
+        if (labels[i] >= 0){
+            double distance = (pcd_[i] - hand_center).squaredNorm();
+            if(distance < distances[labels[i]]){
+                distances[labels[i]] = distance;
+            }
             labels_num[labels[i]]++;
             labels_index[labels[i]].push_back(i);
         }
     }
+    size_t argclose = std::distance(distances.begin(), std::min_element(distances.begin(),distances.end()));
     size_t argmax = std::distance(labels_num.begin(), std::max_element(labels_num.begin(), labels_num.end()));
-    pcd = *pcd.SelectByIndex(labels_index[argmax]);
+    // usually argclose == argmax,  but argclose now
+    pcd = *pcd.SelectByIndex(labels_index[argclose]);
 #endif
 
     //Compute the transformation between the current and global point cloud
