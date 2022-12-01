@@ -147,7 +147,7 @@ bool Registrator::mergePCD(const PCD &pcd_)
     //Evaluate the registration
     bool success = isRegistrationSuccessful(pcd, T);
     //If not successful, keep the global point cloud as is, wait for the user to realign
-//    if (!success) return false;
+    if (!success) return false;
 
     *m_pcd = m_pcd->Transform(T.inverse()); //Bring the global point cloud into the reference of the current frame
     *m_pcd += pcd; //Merge the current frame to the global point cloud

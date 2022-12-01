@@ -81,6 +81,8 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
     RawDataFrame rawDataFrame;
 
+    static int warm_up_frame = 20;
+
     if (!depthProcessor) {
         DirectX::XMMATRIX ahatExtrinsics;
         std::vector<float> ahatLUT;
@@ -109,23 +111,26 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
     bool merge_successful = false;
     if (depthProcessor) {
+        bool pcdUpdated = false;
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
             hasDebugHand = depthProcessor->getNextHandDebugFrame(handTimestamp, debugHandFrame);
+#if 1
+            std::cout << "[PCD] " << pcd.size() << std::endl;
+#endif
+            pcdUpdated = true;
+            redraw = true;
 
-            //merge current pcd with previous data
+        } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
+
+        //merge current pcd with previous data
+        if (pcdUpdated && warm_up_frame == 0) {
 #ifdef USE_DBSCAN
             merge_successful = registrator.mergePCD(pcd, depthProcessor->handMesh);
 #else
             merge_successful = registrator.mergePCD(pcd);
 #endif
-
-#if 1
-            std::cout << "[PCD] " << pcd.size() << std::endl;
-#endif
-            redraw = true;
-
-        } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
+        }
     }
 
     if (redraw) {
@@ -133,30 +138,25 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
         // PCD
         {
-//            Eigen::MatrixXd points(pcd.size(), 3);
-//            for (int i = 0; i < pcd.size(); i++) {
-//                points.row(i) = pcd[i].cast<double>();
-//            }
-//            viewer.data().add_points(points,
-//                                     lostTracking ? Eigen::RowVector3d(1, 0, 0) : Eigen::RowVector3d(1, 1, 1) * 0.8f);
-
             //Display Registration
             if (registrator.getReconstructedPCDInEigenFormat(ReconstructedPCD)) {
                 std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = " << merge_successful << std::endl;
                 viewer.data().add_points(ReconstructedPCD,
-                                         merge_successful ? Eigen::RowVector3d(0, 0.8, 0) : Eigen::RowVector3d(0.8, 0,
-                                                                                                               0));
+                                         merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 1, 0));
                 //Send merged point cloud
                 if (depthProcessor)
                     depthProcessor->sendReconstructedPCD(*registrator.getReconstructedPCD());
             }
 
             // Set camera on first frame
-            static int warm_up_frame = 5;
             if (warm_up_frame > 0 && pcd.size() > 200) {
                 warm_up_frame--;
                 if (warm_up_frame == 0) {
-                    viewer.core().align_camera_center(ReconstructedPCD);
+                    Eigen::MatrixXd points(pcd.size(), 3);
+                    for (int i = 0; i < pcd.size(); i++) {
+                        points.row(i) = pcd[i].cast<double>();
+                    }
+                    viewer.core().align_camera_center(points);
                 }
             }
         }

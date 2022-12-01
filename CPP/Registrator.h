@@ -13,7 +13,7 @@
 #include <DirectXMath.h>
 
 
-#define USE_DBSCAN
+//#define USE_DBSCAN
 
 class Registrator {
 public:
@@ -36,7 +36,7 @@ public:
 #ifdef USE_DBSCAN
     bool mergePCD(const PCD &pcd, std::vector<DirectX::XMVECTOR> handMesh[2]);
 #else
-    bool mergePCD(const PCD &pcd)
+    bool mergePCD(const PCD &pcd);
 #endif
     /**
      * @brief Returns the latest reconstruction result
