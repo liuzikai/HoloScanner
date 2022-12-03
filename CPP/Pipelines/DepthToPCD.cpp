@@ -111,6 +111,12 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
     bool merge_successful = false;
     if (depthProcessor) {
+        if(depthProcessor->receivedStopSignal()) {
+            std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
+            registrator.saveReconstructedMesh("final_mesh.ply");
+            //TODO what to do here? exit(0)? reset()?
+        }
+
         bool pcdUpdated = false;
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;

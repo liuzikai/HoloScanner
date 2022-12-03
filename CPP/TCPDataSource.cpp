@@ -69,7 +69,16 @@ bool TCPDataSource::getNextPCD(timestamp_t &timestamp, PCD &pcd) {
 
 void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, size_t size) {
 
-    if (name == "e") {  // AHAT extrinsics
+    if (name == "s") {  // Stop signal
+        static constexpr size_t EXPECTED_SIZE = 0;
+        if (size != EXPECTED_SIZE) {
+            std::cerr << "Invalid Stop signal. Size: " << size << ", expecting " << EXPECTED_SIZE << std::endl;
+            return;
+        }
+
+        m_stopSignalReceived = true;
+
+    } else if (name == "e") {  // AHAT extrinsics
         static constexpr size_t EXPECTED_SIZE = 16 * sizeof(float);
         if (size != EXPECTED_SIZE) {
             std::cerr << "Invalid AHAT extrinsics size: " << size << ", expecting " << EXPECTED_SIZE << std::endl;
