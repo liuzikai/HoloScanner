@@ -13,7 +13,7 @@ public class ImuVisualize : MonoBehaviour
     public Vector3 AccelVector = Vector3.one;
     public Vector3 GyroEulorAngle = Vector3.zero;
 
-    // Start is called before the first frame update
+    // Scanning is called before the first frame update
     void Start()
     {
         if (AccelXBar && AccelYBar && AccelZBar)
