@@ -29,17 +29,18 @@ public class GazeButton : MonoBehaviour {
 
     void Start() {
         controller = GetComponentInParent<StopStartController>();
+        image.color = startColor;
     }
 
     private void TransitionState() {
         image.fillAmount = 0;
         if(state == State.Scanning) {
-            currentRotationY = 0;
-            image.color = stopColor;
-            controller.StopScanning();
-        } else {
             currentRotationY = 180;
             image.color = startColor;
+            controller.StopScanning();
+        } else {
+            currentRotationY = 0;
+            image.color = stopColor;
             controller.StartScanning();
         }
         timer = 0;
@@ -47,7 +48,8 @@ public class GazeButton : MonoBehaviour {
     }
 
     void Update() {
-        if(state == State.Transitioning) {
+        Debug.Log($"State: {state}");
+        if (state == State.Transitioning) {
             timer += Time.deltaTime;
             transform.localRotation = Quaternion.Euler(0, currentRotationY + 180 * timer / TRANSITION_DURATION, 0);
             if(timer >= TRANSITION_DURATION) {
@@ -58,10 +60,10 @@ public class GazeButton : MonoBehaviour {
             Ray ray = new Ray(gazeProvider.GazeOrigin, gazeProvider.GazeDirection);
             isGazing = Physics.Raycast(ray, 10, gazableMask);
             if (isGazing) {
-                Debug.Log("Gazing!");
+                //Debug.Log("Gazing!");
                 timer += Time.deltaTime;
             } else {
-                Debug.Log(ray);
+                //Debug.Log(ray);
                 timer -= Time.deltaTime;
             }
             timer = Mathf.Clamp(timer, 0, FILL_DURATION);
