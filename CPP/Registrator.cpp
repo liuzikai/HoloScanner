@@ -141,7 +141,7 @@ bool Registrator::mergePCD(const PCD &pcd_)
 
     //Compute the transformation between the current and global point cloud
     Eigen::Matrix6d InfoMat;
-    double kernel_param = 0.01;
+    double kernel_param = 0.1;
     Eigen::Matrix4d T = getTransformation(pcd, *m_pcd, InfoMat, kernel_param);
 
     //Evaluate the registration

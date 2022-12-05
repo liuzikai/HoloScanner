@@ -23,6 +23,8 @@ public:
 
 public:
 
+    static constexpr int MAX_PENDING_FRAMES = 3;
+
     static constexpr size_t ROI_ROW_LOWER = 256 - 168;
     static constexpr size_t ROI_ROW_UPPER = 256 + 80;
     static constexpr size_t ROI_COL_LOWER = 256 - 128;

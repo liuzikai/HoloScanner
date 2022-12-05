@@ -98,6 +98,14 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
         }
 
     } else if (name == "R") {  // raw data: AHAT depth + rig2world + interaction
+        {
+            std::lock_guard<std::mutex> lock(rawDataFrameMutex);
+            if (rawDataFrames.size() > MAX_PENDING_FRAMES) {
+                // std::cout << "Discard frames" << std::endl;
+                return;
+            }
+        }
+
         RawDataFrame frame;
 
         static constexpr size_t TIMESTAMP_SIZE = sizeof(timestamp_t);

@@ -29,6 +29,7 @@ public:
 private:
 
     static constexpr int PORT = 9090;
+    static constexpr int MAX_PENDING_FRAMES = 3;
 
     boost::asio::io_context tcpIOContext;
     std::thread *tcpIOThread = nullptr;
