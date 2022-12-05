@@ -32,9 +32,9 @@ Eigen::Matrix4d Registrator::getTransformation(const geometry::PointCloud &sourc
                                                const geometry::PointCloud &target, Eigen::Matrix6d &InfoMat,
                                                const double kernel_param) const {
 
-    int nb_iterations = 300;
+    int nb_iterations = 600;
 
-    double voxel_size = 0.02;
+    double voxel_size = 0.01;
     Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
     for (int i = 0; i < 4; ++i) {
         auto source_down = source.VoxelDownSample(voxel_size);
@@ -151,7 +151,7 @@ bool Registrator::mergePCD(const PCD &pcd_)
 
     *m_pcd = m_pcd->Transform(T.inverse()); //Bring the global point cloud into the reference of the current frame
     *m_pcd += pcd; //Merge the current frame to the global point cloud
-    m_pcd = m_pcd->VoxelDownSample(0.005); //downsample for performance
+    m_pcd = m_pcd->VoxelDownSample(0.0025); //downsample for performance
 
     return true;
 }

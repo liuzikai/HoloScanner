@@ -47,11 +47,13 @@ public:
         }
     }
 
-    bool sendReconstructedPCD(const PCD& pcd) override {
-        //TODO implement (probably not necessary actually since we are already visualizing locally)
+    bool sendReconstructedPCD(const PCD &pcd, const DirectX::XMMATRIX &rig2world) override {
+        // FIXME: should not be here
         return false;
     }
 };
+
+TCPDataSource tcpStreamingSource;
 
 Registrator registrator;
 
@@ -144,8 +146,8 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                 viewer.data().add_points(ReconstructedPCD,
                                          merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 1, 0));
                 //Send merged point cloud
-                if (depthProcessor)
-                    depthProcessor->sendReconstructedPCD(*registrator.getReconstructedPCD());
+                // TODO: global variable...
+                tcpStreamingSource.sendReconstructedPCD(*registrator.getReconstructedPCD(), rawDataFrame.rig2world);
             }
 
             // Set camera on first frame
@@ -254,7 +256,6 @@ int main() {
     std::ios::sync_with_stdio(false);
 
 #ifdef BOOST_AVAILABLE
-    TCPDataSource tcpStreamingSource;
     discardDelayedFrames = true;
     rawDataSource = static_cast<RawDataSource *>(&tcpStreamingSource);
 #else

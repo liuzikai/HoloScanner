@@ -30,10 +30,17 @@ TCPDataSource::~TCPDataSource() {
     if (tcpIOThread) tcpIOThread->join();
 }
 
-bool TCPDataSource::sendReconstructedPCD(const PCD& pcd) {
-    //TODO implement sending back to the Hololens
-    //socketServer.sendBytes(...);
+bool TCPDataSource::sendReconstructedPCD(const PCD &pcd, const DirectX::XMMATRIX &rig2world) {
     return false;
+    std::vector<float> f;
+    f.reserve(pcd.size() * 3);
+    for (const auto &v : pcd) {
+        f.emplace_back(-v(1));
+        f.emplace_back(-v(0));
+        f.emplace_back(v(2));
+    }
+    socketServer.sendBytes("P", reinterpret_cast<uint8_t *>(f.data()), f.size() * sizeof(float));
+    return true;
 }
 
 bool TCPDataSource::getAHATExtrinsics(DirectX::XMMATRIX &extrinsics) {
