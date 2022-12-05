@@ -6,6 +6,20 @@ set(CMAKE_CXX_STANDARD 17)
 include_directories(HL2UnityPlugin)
 include_directories(CPP)
 
+#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+
+SET(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH} "C:/boost_1_80_0")
+SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} "C:/boost_1_80_0/lib64-msvc-14.3")
+SET(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH} "C:/Open3d")
+SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} "C:/Open3d/lib")
+SET(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} "C:/Open3d")
+
+include_directories("C:/boost_1_80_0")
+include_directories("C:/Open3d")
+link_directories("C:/Open3d/lib")
+#link_libraries(glfw3.lib)
+
 # Find Boost (optional)
 find_package(Boost COMPONENTS system)
 if (Boost_FOUND)
@@ -17,6 +31,8 @@ endif ()
 
 # DirectXMath
 add_subdirectory(CPP/DirectXMath)
+
+set(DOpen3D_ROOT C:/Open3d)
 
 # Open3D
 find_package(Open3D REQUIRED)
@@ -37,6 +53,7 @@ if (Boost_FOUND)
             DirectXMath
             ${LIGIGL_LIBERIES}
             )
+    target_compile_options(libTCPServer PRIVATE "/MT$<$<CONFIG:Release>:>")
 else()
     message("=> Target libTCPServer is not available to build. Depends: Boost")
 endif ()
@@ -48,6 +65,7 @@ add_executable(DepthToPCD
         CPP/Pipelines/DepthToPCD.cpp
         CPP/Registrator.cpp
         )
+target_compile_options(DepthToPCD PRIVATE "/MT$<$<CONFIG:Release>:>")
 target_link_libraries(DepthToPCD
         DirectXMath
         ${LIGIGL_LIBERIES}

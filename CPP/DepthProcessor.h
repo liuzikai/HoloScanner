@@ -25,8 +25,8 @@ public:
 
     static constexpr size_t ROI_ROW_LOWER = 256 - 168;
     static constexpr size_t ROI_ROW_UPPER = 256 + 80;
-    static constexpr size_t ROI_COL_LOWER = 256 - 128;
-    static constexpr size_t ROI_COL_UPPER = 256 + 128;
+    static constexpr size_t ROI_COL_LOWER = 256 - 150;
+    static constexpr size_t ROI_COL_UPPER = 256 + 150;
     static constexpr uint16_t DEPTH_NEAR_CLIP = 200;  // Unit: mm
     static constexpr uint16_t DEPTH_FAR_CLIP = 800;
     static constexpr uint16_t DEPTH_FILTER_OFFSET = 200;
@@ -39,7 +39,7 @@ public:
     size_t stdLogIndex = 0;
     static constexpr size_t STD_LOG_SIZE = 10;
 
-    static constexpr float MAX_STD_VAL = 14500.0f; // squared value on purpose
+    static constexpr float MAX_STD_VAL = 15500.0f; // squared value on purpose
 
 
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;

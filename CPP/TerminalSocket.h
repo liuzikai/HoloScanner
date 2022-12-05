@@ -216,13 +216,13 @@ private:
     ReceiverState recvState = RECV_PREAMBLE;
 
     std::vector<uint8_t> recvBuf;  // use std::vector to ensure the support of large packages
-    ssize_t recvOffset = 0;
+    size_t recvOffset = 0;
 
-    ssize_t recvRemainingBytes = 0;
+    size_t recvRemainingBytes = 0;
     PackageType recvCurrentPackageType = PACKAGE_TYPE_COUNT;
-    ssize_t recvNameStart = -1;
-    ssize_t recvContentSize = -1;
-    ssize_t recvContentStart = -1;
+    size_t recvNameStart = -1;
+    size_t recvContentSize = -1;
+    size_t recvContentStart = -1;
 
     template<class T>
     void

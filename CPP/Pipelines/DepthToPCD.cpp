@@ -81,7 +81,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
     RawDataFrame rawDataFrame;
 
-    static int warm_up_frame = 20;
+    static int warm_up_frame = 100;
 
     if (!depthProcessor) {
         DirectX::XMMATRIX ahatExtrinsics;
@@ -152,6 +152,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
             if (warm_up_frame > 0 && pcd.size() > 200) {
                 warm_up_frame--;
                 if (warm_up_frame == 0) {
+                    std::cout << "============================================================" << std::endl;
                     Eigen::MatrixXd points(pcd.size(), 3);
                     for (int i = 0; i < pcd.size(); i++) {
                         points.row(i) = pcd[i].cast<double>();

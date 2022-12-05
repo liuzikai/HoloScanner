@@ -32,11 +32,11 @@ Eigen::Matrix4d Registrator::getTransformation(const geometry::PointCloud &sourc
                                                const geometry::PointCloud &target, Eigen::Matrix6d &InfoMat,
                                                const double kernel_param) const {
 
-    int nb_iterations = 300;
+    int nb_iterations = 1200;
 
-    double voxel_size = 0.02;
+    double voxel_size = 0.01;
     Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 3; ++i) {
         auto source_down = source.VoxelDownSample(voxel_size);
         source_down->EstimateNormals(open3d::geometry::KDTreeSearchParamHybrid(
                 voxel_size * 2.0, 30));
@@ -71,13 +71,57 @@ bool Registrator::isRegistrationSuccessful(const geometry::PointCloud &pcd, cons
     return high_fitness && low_rmse;
 }
 
+std::tuple<std::shared_ptr<geometry::PointCloud>,
+    std::shared_ptr<pipelines::registration::Feature>>
+    PreprocessPointCloud(const geometry::PointCloud& pcd, const float voxel_size) {
+    auto pcd_down = pcd.VoxelDownSample(voxel_size);
+    pcd_down->EstimateNormals(
+        open3d::geometry::KDTreeSearchParamHybrid(2 * voxel_size, 30));
+    auto pcd_fpfh = pipelines::registration::ComputeFPFHFeature(
+        *pcd_down, open3d::geometry::KDTreeSearchParamHybrid(5 * voxel_size, 100));
+    return std::make_tuple(pcd_down, pcd_fpfh);
+}
+
+Eigen::Matrix4d global_registration(const geometry::PointCloud& source,
+    const geometry::PointCloud& target, Eigen::Matrix6d& InfoMat,
+    const float max_correspondance_dist,
+    const double voxel_size) {
+    std::shared_ptr<geometry::PointCloud> source_down, target_down;
+    std::shared_ptr<pipelines::registration::Feature> source_fpfh, target_fpfh;
+    std::tie(source_down, source_fpfh) = PreprocessPointCloud(source, voxel_size);
+    std::tie(target_down, target_fpfh) = PreprocessPointCloud(target, voxel_size);
+
+    pipelines::registration::RegistrationResult registration_result;
+
+    // Prepare checkers
+    std::vector<std::reference_wrapper<
+        const pipelines::registration::CorrespondenceChecker>> correspondence_checker;
+    auto correspondence_checker_edge_length =
+        pipelines::registration::CorrespondenceCheckerBasedOnEdgeLength(0.9);
+    auto correspondence_checker_distance =
+        pipelines::registration::CorrespondenceCheckerBasedOnDistance(max_correspondance_dist);
+    correspondence_checker.push_back(correspondence_checker_edge_length);
+    correspondence_checker.push_back(correspondence_checker_distance);
+
+    bool mutual_filter = false;
+    float confidence = 0.999;
+    int max_iterations = 4000;
+    registration_result = pipelines::registration::RegistrationRANSACBasedOnFeatureMatching(
+        *source_down, *target_down, *source_fpfh, *target_fpfh,
+        mutual_filter, max_correspondance_dist,
+        pipelines::registration::TransformationEstimationPointToPoint(false),
+        3, correspondence_checker,
+        pipelines::registration::RANSACConvergenceCriteria(max_iterations, confidence));
+    return registration_result.transformation_;
+}
+
 #ifdef USE_DBSCAN
 bool Registrator::mergePCD(const PCD &pcd_, std::vector<DirectX::XMVECTOR> handMesh[2]) 
 #else 
 bool Registrator::mergePCD(const PCD &pcd_) 
 #endif
 {
-    if (pcd_.size() < 2000) return false;
+    if (pcd_.size() < 500) return false;
     auto pcd = geometry::PointCloud(pcd_);
     if (m_pcd == nullptr) { //First registration is always successful as it initializes the point cloud
         m_pcd = std::make_shared<geometry::PointCloud>(pcd);
@@ -95,10 +139,13 @@ bool Registrator::mergePCD(const PCD &pcd_)
     //     }
     //     pcd.points_ = valid_points;
     //}
+    //std::vector<size_t> index = std::get<1>(pcd.RemoveStatisticalOutliers(16, 0.8));
+    //pcd = *pcd.SelectByIndex(index);
+
 #ifdef USE_DBSCAN
     std::vector<size_t> index = std::get<1>(pcd.RemoveStatisticalOutliers(16, 0.8));
     pcd = *pcd.SelectByIndex(index);
-    std::vector<int> labels = pcd.ClusterDBSCAN(0.013, 64);
+    std::vector<int> labels = pcd.ClusterDBSCAN(0.005, 4);
     std::set<int> labels_unique;
     for (int i = 0; i < labels.size(); ++i) {
         if (labels[i] >= 0) {
@@ -109,9 +156,11 @@ bool Registrator::mergePCD(const PCD &pcd_)
     Eigen::Vector3d hand_center(0.0, 0.0, 0.0);
     for(size_t i=0; i<2; ++i){
         for(size_t j=0; j<handMesh[i].size(); ++j){
-            hand_center[0] -= handMesh[i][j][1];
-            hand_center[1] -= handMesh[i][j][0];
-            hand_center[2] += handMesh[i][j][2];
+            DirectX::XMFLOAT3 f;
+            DirectX::XMStoreFloat3(&f, handMesh[i][j]);
+            hand_center[0] -= f.y;
+            hand_center[1] -= f.x;
+            hand_center[2] += f.z;
         }
     }
 
@@ -147,11 +196,18 @@ bool Registrator::mergePCD(const PCD &pcd_)
     //Evaluate the registration
     bool success = isRegistrationSuccessful(pcd, T);
     //If not successful, keep the global point cloud as is, wait for the user to realign
-    if (!success) return false;
+    if (!success) {
+        T = global_registration(pcd, *m_pcd, InfoMat, m_max_corr_dist_transformation, 0.01);
+        success = isRegistrationSuccessful(pcd, T);
+        if (!success)
+            return false;
+    }
+    
+
 
     *m_pcd = m_pcd->Transform(T.inverse()); //Bring the global point cloud into the reference of the current frame
     *m_pcd += pcd; //Merge the current frame to the global point cloud
-    m_pcd = m_pcd->VoxelDownSample(0.005); //downsample for performance
+    m_pcd = m_pcd->VoxelDownSample(0.0025); //downsample for performance
 
     return true;
 }
