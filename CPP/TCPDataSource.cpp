@@ -5,6 +5,7 @@
 #include <iostream>
 #include <ctime>
 #include "DirectXHelpers.h"
+#include "EigenHelpers.h"
 #include "TCPDataSource.h"
 
 TCPDataSource::TCPDataSource() :
@@ -31,15 +32,18 @@ TCPDataSource::~TCPDataSource() {
 }
 
 bool TCPDataSource::sendReconstructedPCD(const PCD &pcd, const DirectX::XMMATRIX &rig2world) {
-    return false;
-    std::vector<float> f;
-    f.reserve(pcd.size() * 3);
-    for (const auto &v : pcd) {
-        f.emplace_back(-v(1));
-        f.emplace_back(-v(0));
-        f.emplace_back(v(2));
+    std::vector<float> data;
+    data.reserve(pcd.size() * 3);
+    for (const auto &e : pcd) {
+        DirectX::XMVECTOR v = EigenVector3dToXMVector(e);
+        v = DirectX::XMVector3Transform(v, rig2world);
+        DirectX::XMFLOAT4 f;
+        DirectX::XMStoreFloat4(&f, v);
+        data.emplace_back((float) f.x / f.w);
+        data.emplace_back((float) f.y / f.w);
+        data.emplace_back((float) -f.z / f.w);
     }
-    socketServer.sendBytes("P", reinterpret_cast<uint8_t *>(f.data()), f.size() * sizeof(float));
+    socketServer.sendBytes("P", reinterpret_cast<uint8_t *>(data.data()), data.size() * sizeof(float));
     return true;
 }
 
