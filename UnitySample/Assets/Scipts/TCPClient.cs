@@ -84,7 +84,7 @@ public class TCPClient : MonoBehaviour
                 socket = new StreamSocket();
 
                 var hostName = new Windows.Networking.HostName(hostIPAddress);
-                ConnectButtonText.text = "Trying " + ConnectedHostIP;
+                ConnectButtonText.text = "Trying " + hostIPAddress;
 
                 var cts = new CancellationTokenSource();
                 cts.CancelAfter(2000);  // cancel after 2 seconds
@@ -138,6 +138,8 @@ public class TCPClient : MonoBehaviour
         if (videoStream.InteractionStreaming) videoStream.ToggleInteractionStreamingEvent();
         if (videoStream.PointCloudStreaming) videoStream.TogglePointCloudStreamingEvent();
 
+        Connected = false;
+
         dw?.DetachStream();
         dw?.Dispose();
         dw = null;
@@ -149,7 +151,6 @@ public class TCPClient : MonoBehaviour
         readingTask = null;  // discard the task
 
         socket?.Dispose();
-        Connected = false;
         ConnectionStatusLED.material.color = Color.red;
         ConnectButtonText.text = "Connect to Server";
 
@@ -319,20 +320,40 @@ public class TCPClient : MonoBehaviour
     {
         try 
         {
+            videoStream.text.text = "0 " + dr.UnconsumedBufferLength.ToString() + " ";
             await dr.LoadAsync(1);
+            videoStream.text.text += "1 ";
             if (dr.ReadByte() != Preamble) return null;
+            videoStream.text.text += "2 ";
             await dr.LoadAsync(1);
+            videoStream.text.text += "3 ";
             if (dr.ReadByte() != (byte) PackageType.Bytes) return null;
+            videoStream.text.text += "4 ";
             await dr.LoadAsync(2);  // NOTICE: here we hard code the name to be length-1 string
+            videoStream.text.text += "5 " + dr.ReadByte().ToString();
             dr.ReadByte();
-            dr.ReadByte();
+            await dr.LoadAsync(4);
+            videoStream.text.text += "6 ";
             uint bytesToRead = dr.ReadUInt32();
-            var bytes = new byte[bytesToRead];
-            dr.ReadBytes(bytes);
-            return BytesToFloat(bytes);
+            videoStream.text.text += "7 " + bytesToRead.ToString();
+            if (bytesToRead != 0)
+            {
+                await dr.LoadAsync(bytesToRead);
+                videoStream.text.text += "8 ";
+                var bytes = new byte[bytesToRead];
+                dr.ReadBytes(bytes);
+                videoStream.text.text += "9 ";
+                return BytesToFloat(bytes);
+            }
+            else 
+            {
+                videoStream.text.text += "X ";
+                return null;
+            }
         }
         catch (Exception ex)
         {
+            videoStream.text.text += ex.Message;
             Debug.Log(ex.Message);
             return null;
         }
@@ -342,17 +363,20 @@ public class TCPClient : MonoBehaviour
     void LateUpdate()
     {
 #if WINDOWS_UWP
-        if (dr) 
+        if (Connected && dr != null) 
         {
-            if (readingTask) 
+            if (readingTask != null) 
             {
                 if (readingTask.IsCompleted) 
                 {
+                    videoStream.text.text += "Y ";
                     if (readingTask.Status == TaskStatus.RanToCompletion) 
                     {
+                        videoStream.text.text += "Z ";
                         float[] f = readingTask.Result;
-                        if (f) 
+                        if (f != null) 
                         {
+                            videoStream.text.text += "W " + f.Length.ToString();
                             videoStream.RenderPointCloud(videoStream.FloatToVector3(f));
                         }
                     }
@@ -383,9 +407,9 @@ public class TCPClient : MonoBehaviour
     }
     float[] BytesToFloat(byte[] data)
     {
-        if (data.length % sizeof(float) != 0) return null;
+        if ((data.Length % sizeof(float)) != 0) return null;
         float[] f = new float[data.Length / sizeof(float)];
-        System.Buffer.BlockCopy(data, 0, f, 0, f.Length);
+        System.Buffer.BlockCopy(data, 0, f, 0, data.Length);
         return f;
     }
     #endregion
