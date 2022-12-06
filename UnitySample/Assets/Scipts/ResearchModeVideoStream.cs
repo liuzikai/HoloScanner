@@ -368,7 +368,7 @@ public class ResearchModeVideoStream : MonoBehaviour
             if (pointCloud.Length > 0)
             {
                 Vector3[] pointCloudVector3 = FloatToVector3(pointCloud);
-                if (depthSensorMode == DepthSensorMode.ShortThrow) 
+                /* if (depthSensorMode == DepthSensorMode.ShortThrow) 
                 {
                     text.text = "AHAT ";
                 } 
@@ -380,7 +380,7 @@ public class ResearchModeVideoStream : MonoBehaviour
                 if (tcpClient != null)
                 {
                     text.text += "\n"+ "TCP Pending: " + tcpClient.PendingMessageCount.ToString();
-                }
+                } */
 
                 if (renderPointCloud)
                 {
@@ -404,6 +404,7 @@ public class ResearchModeVideoStream : MonoBehaviour
         {
             pointCloudVector3[i] = new Vector3(pointCloud[3 * i], pointCloud[3 * i + 1], pointCloud[3 * i + 2]);
         }
+        return pointCloudVector3;
     }
 
     public void RenderPointCloud(Vector3[] pointCloudVector3) 
@@ -425,11 +426,14 @@ public class ResearchModeVideoStream : MonoBehaviour
         renderPointCloud = !renderPointCloud;
         if (renderPointCloud)
         {
-            pointCloudRendererGo.SetActive(true);
+            // pointCloudRendererGo.SetActive(true);
         }
         else
         {
-            pointCloudRendererGo.SetActive(false);
+            // pointCloudRendererGo.SetActive(false);
+#if WINDOWS_UWP
+            RenderPointCloud(new Vector3[]{});
+#endif
         }
     }
 
