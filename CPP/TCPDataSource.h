@@ -27,6 +27,8 @@ public:
     bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
                               const DirectX::XMMATRIX &rig2world) override;
 
+    bool receivedStopSignal() const { return m_stopSignalReceived; }
+
 private:
 
     static constexpr int PORT = 9090;
@@ -49,6 +51,8 @@ private:
 
     std::queue<std::pair<timestamp_t, PCD>> pcdFrames;
     std::mutex pcdMutex;
+	
+	m_stopSignalReceived = false;
 };
 
 
