@@ -11,6 +11,7 @@ using std::cout;
 using std::endl;
 
 std::unique_ptr<PCD> Registrator::getReconstructedPCD() const {
+    if (!m_pcd) return nullptr;
     PCD pcd;
     pcd.reserve(m_pcd->points_.size());
     for (const auto &p: m_pcd->points_) {

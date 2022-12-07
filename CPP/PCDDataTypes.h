@@ -24,5 +24,6 @@ public:
      * @return true if successfully sent
      */
     // FIXME: should not be here
-    virtual bool sendReconstructedPCD(const PCD &pcd, const DirectX::XMMATRIX &rig2world) = 0;
+    virtual bool
+    sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd, const DirectX::XMMATRIX &rig2world) = 0;
 };
