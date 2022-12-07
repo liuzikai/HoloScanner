@@ -114,12 +114,12 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
     bool merge_successful = false;
     if (depthProcessor) {
-        if(depthProcessor->receivedStopSignal()) {
+        if(tcpStreamingSource.receivedStopSignal()) {
             std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
-            registrator.saveReconstructedMesh("final_mesh.ply");
+//            registrator.saveReconstructedMesh("final_mesh.ply");
             registrator.reset();
             //depthProcessor.resetStopSignal();
-            depthProcessor = nullptr;
+            depthProcessor.reset(nullptr);
             return false;
         }
 

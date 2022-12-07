@@ -57,7 +57,7 @@ public:
      */
     void saveReconstructedMesh(const std::string &save_path) const;
 
-    void reset() const;
+    void reset();
 
 private:
     std::shared_ptr<open3d::geometry::PointCloud> m_pcd;

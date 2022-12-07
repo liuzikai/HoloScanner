@@ -56,7 +56,7 @@ private:
     std::queue<std::pair<timestamp_t, PCD>> pcdFrames;
     std::mutex pcdMutex;
 	
-	m_stopSignalReceived = false;
+	bool m_stopSignalReceived = false;
 };
 
 

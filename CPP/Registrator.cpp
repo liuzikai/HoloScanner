@@ -10,9 +10,8 @@ using namespace open3d;
 using std::cout;
 using std::endl;
 
-void Registrator::reset() const {
-    m_pcd->clear();
-    //m_pcd
+void Registrator::reset() {
+    m_pcd = nullptr;
 }
 
 std::unique_ptr<PCD> Registrator::getReconstructedPCD() const {
@@ -78,9 +77,10 @@ bool Registrator::isRegistrationSuccessful(const geometry::PointCloud &pcd, cons
 }
 
 #ifdef USE_DBSCAN
-bool Registrator::mergePCD(const PCD &pcd_, std::vector<DirectX::XMVECTOR> handMesh[2]) 
-#else 
-bool Registrator::mergePCD(const PCD &pcd_) 
+bool Registrator::mergePCD(const PCD &pcd_, std::vector<DirectX::XMVECTOR> handMesh[2])
+#else
+
+bool Registrator::mergePCD(const PCD &pcd_)
 #endif
 {
     if (pcd_.size() < 2000) return false;
