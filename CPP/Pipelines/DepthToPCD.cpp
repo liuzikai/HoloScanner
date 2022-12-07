@@ -116,9 +116,9 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     if (depthProcessor) {
         if(tcpStreamingSource.receivedStopSignal()) {
             std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
-//            registrator.saveReconstructedMesh("final_mesh.ply");
+            registrator.saveReconstructedMesh("final_mesh.ply");
             registrator.reset();
-            //depthProcessor.resetStopSignal();
+            tcpStreamingSource.resetStopSignal();
             depthProcessor.reset(nullptr);
             return false;
         }
