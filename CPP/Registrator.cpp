@@ -130,14 +130,6 @@ bool Registrator::mergePCD(const PCD &pcd_)
     if (pcd_.size() < 1000) return false;
     auto pcd = geometry::PointCloud(pcd_);
 
-    if (pcd == nullptr) {
-        std::cout << "############################################" << std::endl;
-        std::cout << "############################################" << std::endl;
-        std::cout << "######### Aaaaaaaaaaaaaaaaaaaaaaaah ########" << std::endl;
-        std::cout << "############################################" << std::endl;
-        std::cout << "############################################" << std::endl;
-    }
-
     if (m_pcd == nullptr) { //First registration is always successful as it initializes the point cloud
         m_pcd = std::make_shared<geometry::PointCloud>(pcd);
         return true;
