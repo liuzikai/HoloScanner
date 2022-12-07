@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Microsoft.MixedReality.Toolkit.Input;
 using UnityEngine.UI;
+using Microsoft.MixedReality.Toolkit;
 
 public class GazeButton : MonoBehaviour {
 
@@ -48,7 +49,7 @@ public class GazeButton : MonoBehaviour {
     }
 
     void Update() {
-        Debug.Log($"State: {state}");
+        // Debug.Log($"State: {state}");
         if (state == State.Transitioning) {
             timer += Time.deltaTime;
             transform.localRotation = Quaternion.Euler(0, currentRotationY + 180 * timer / TRANSITION_DURATION, 0);
@@ -57,15 +58,15 @@ public class GazeButton : MonoBehaviour {
                 state = controller.IsScanning ? State.Scanning : State.NotScanning;
             }
         } else {
-            Ray ray = new Ray(gazeProvider.GazeOrigin, gazeProvider.GazeDirection);
+            Ray ray = new Ray(CoreServices.InputSystem.GazeProvider.GazeOrigin, CoreServices.InputSystem.GazeProvider.GazeDirection);
             isGazing = Physics.Raycast(ray, 10, gazableMask);
             if (isGazing) {
                 //Debug.Log("Gazing!");
                 timer += Time.deltaTime;
             } else {
-                //Debug.Log(ray);
                 timer -= Time.deltaTime;
             }
+            // Debug.Log(ray);
             timer = Mathf.Clamp(timer, 0, FILL_DURATION);
             image.fillAmount = timer / FILL_DURATION;
             if (timer >= FILL_DURATION) {
