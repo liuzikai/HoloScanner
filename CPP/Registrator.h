@@ -57,6 +57,8 @@ public:
      */
     void saveReconstructedMesh(const std::string &save_path) const;
 
+    void reset() const;
+
 private:
     std::shared_ptr<open3d::geometry::PointCloud> m_pcd;
     float m_max_corr_dist_transformation = 0.005;

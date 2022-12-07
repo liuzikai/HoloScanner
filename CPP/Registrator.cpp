@@ -10,6 +10,11 @@ using namespace open3d;
 using std::cout;
 using std::endl;
 
+void Registrator::reset() const {
+    m_pcd->clear();
+    //m_pcd
+}
+
 std::unique_ptr<PCD> Registrator::getReconstructedPCD() const {
     if (!m_pcd) return nullptr;
     PCD pcd;

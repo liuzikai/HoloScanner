@@ -29,6 +29,10 @@ public:
 
     bool receivedStopSignal() const { return m_stopSignalReceived; }
 
+    void resetStopSignal() {
+        m_stopSignalReceived = false;
+    }
+
 private:
 
     static constexpr int PORT = 9090;

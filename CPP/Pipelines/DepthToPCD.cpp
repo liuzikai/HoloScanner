@@ -117,7 +117,10 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         if(depthProcessor->receivedStopSignal()) {
             std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
             registrator.saveReconstructedMesh("final_mesh.ply");
-            //TODO what to do here? exit(0)? reset()?
+            registrator.reset();
+            //depthProcessor.resetStopSignal();
+            depthProcessor = nullptr;
+            return false;
         }
 
         bool pcdUpdated = false;
@@ -155,6 +158,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
                           << merge_successful << std::endl;
                 viewer.data().add_points(ReconstructedPCD, pointColor);
                 tcpStreamingSource.sendReconstructedPCD(pointColor, *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
+
             }
 
             //Send merged point cloud
