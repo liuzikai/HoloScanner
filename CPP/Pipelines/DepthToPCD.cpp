@@ -117,6 +117,12 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         if(tcpStreamingSource.receivedStopSignal()) {
             std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
             registrator.saveReconstructedMesh("final_mesh.ply");
+            
+            Eigen::RowVector3d pointColor = Eigen::RowVector3d(1, 1, 1);
+            viewer.data().clear();
+            viewer.data().add_points(ReconstructedPCD, pointColor);
+            tcpStreamingSource.sendReconstructedPCD(pointColor, *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
+            
             registrator.reset();
             tcpStreamingSource.resetStopSignal();
             depthProcessor.reset(nullptr);

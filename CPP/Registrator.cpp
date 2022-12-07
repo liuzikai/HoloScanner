@@ -226,7 +226,7 @@ bool Registrator::mergePCD(const PCD &pcd_)
     return true;
 }
 
-void Registrator::update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const {
+void Registrator::update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<size_t> &index) const {
     PCD points = pcd->points_;
     PCD new_points;
     for(int i=0; i<index.size(); ++i){

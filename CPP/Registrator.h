@@ -67,7 +67,7 @@ private:
     float m_max_rmse = 0.004;
     float m_min_fitness = 0.97;
 
-    void update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const;
+    void update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<size_t> &index) const;
 
     /**
      * @brief Construct a new is Registration Successful object
