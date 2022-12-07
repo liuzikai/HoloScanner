@@ -226,10 +226,46 @@ bool Registrator::mergePCD(const PCD &pcd_)
     return true;
 }
 
+void Registrator::update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const {
+    PCD points = pcd->points_;
+    PCD new_points;
+    for(int i=0; i<index.size(); ++i){
+        new_points.push_back(points[index[i]]);
+    }
+    pcd->points_ = new_points;
+}
+
 void Registrator::saveReconstructedMesh(const std::string &save_path) const {
     std::shared_ptr<open3d::geometry::TriangleMesh> mesh;
     std::vector<double> densities;
     m_pcd->EstimateNormals();
+#ifdef FINAL_DBSCAN
+    std::vector<size_t> index = std::get<1>(m_pcd->RemoveStatisticalOutliers(16, 0.8));
+    update_pcd(m_pcd, index);
+    std::vector<int> labels = m_pcd->ClusterDBSCAN(0.013, 64);
+    std::set<int> labels_unique;
+    for (int i = 0; i < labels.size(); ++i) {
+        if (labels[i] >= 0) {
+            labels_unique.insert(labels[i]);
+        }
+    }
+    // some recording for each cluster
+    std::vector<size_t> labels_num(labels_unique.size(), 0);
+    std::vector<std::vector<size_t>> labels_index;
+    for (int i = 0; i < labels_unique.size(); ++i) {
+        labels_index.push_back(std::vector<size_t>());
+    }
+    for (size_t i = 0; i < labels.size(); ++i) {
+        if (labels[i] >= 0){
+            labels_num[labels[i]]++;
+            labels_index[labels[i]].push_back(i);
+        }
+    }
+    size_t argmax = std::distance(labels_num.begin(), std::max_element(labels_num.begin(), labels_num.end()));
+    // auto m_pcd = m_pcd->SelectByIndex(labels_index[argmax]);
+    update_pcd(m_pcd, labels_index[argmax]);
+    // m_pcd = std::make_shared<open3d::geometry::PointCloud>(pcd);
+#endif
     float scale = 3;
     std::tie(mesh, densities) = geometry::TriangleMesh::CreateFromPointCloudPoisson(*m_pcd, 8UL, 0, scale);
     io::WriteTriangleMesh(save_path, *mesh);
