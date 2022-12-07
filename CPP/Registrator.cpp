@@ -37,7 +37,7 @@ Eigen::Matrix4d Registrator::getTransformation(const geometry::PointCloud &sourc
                                                const geometry::PointCloud &target, Eigen::Matrix6d &InfoMat,
                                                const double kernel_param) const {
 
-    int nb_iterations = 1000;
+    int nb_iterations = 600;
 
     double voxel_size = 0.01;
     Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
@@ -184,13 +184,13 @@ bool Registrator::mergePCD(const PCD &pcd_)
     // labels_index has size ulSize
     // labels has size lSize
     // lSize <= ulSize
-    if (pcd_.size() != lSize) {
-        std::cout << "############################################" << std::endl;
-        std::cout << "############################################" << std::endl;
-        std::cout << "######### Noooooooooooooooooooooooo ########" << std::endl;
-        std::cout << "############################################" << std::endl;
-        std::cout << "############################################" << std::endl;
-    }
+    //if (pcd_.size() != lSize) {
+    //    std::cout << "############################################" << std::endl;
+    //    std::cout << "############################################" << std::endl;
+    //    std::cout << "######### Noooooooooooooooooooooooo ########" << std::endl;
+    //    std::cout << "############################################" << std::endl;
+    //    std::cout << "############################################" << std::endl;
+    //}
 
     for (size_t i = 0; i < lSize; ++i) {
         if (labels[i] >= 0){

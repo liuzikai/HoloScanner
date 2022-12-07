@@ -362,14 +362,14 @@ bool DepthProcessor::update(const RawDataFrame &input) {
         );
 
         // left thumb
-        thumbNormals(
-                lhJoints[HandJointIndex::ThumbTip].translationInRig,
-                lhJoints[HandJointIndex::ThumbDistal].translationInRig,
-                lhJoints[HandJointIndex::ThumbProximal].translationInRig,
-                lnTDir, THUMB_RADIUS, false,
-                handMesh[Left], handMeshIndices[Left],
-                handFilterDistanceSq[Left]
-        );
+        //thumbNormals(
+        //        lhJoints[HandJointIndex::ThumbTip].translationInRig,
+        //        lhJoints[HandJointIndex::ThumbDistal].translationInRig,
+        //        lhJoints[HandJointIndex::ThumbProximal].translationInRig,
+        //        lnTDir, THUMB_RADIUS, false,
+        //        handMesh[Left], handMeshIndices[Left],
+        //        handFilterDistanceSq[Left]
+        //);
     }
 
     if (input.hands[Right].strictlyTracked) {
@@ -428,14 +428,14 @@ bool DepthProcessor::update(const RawDataFrame &input) {
         );
 
         // right thumb
-        thumbNormals(
-                rhJoints[HandJointIndex::ThumbTip].translationInRig,
-                rhJoints[HandJointIndex::ThumbDistal].translationInRig,
-                rhJoints[HandJointIndex::ThumbProximal].translationInRig,
-                rnTDir, THUMB_RADIUS, true,
-                handMesh[Right], handMeshIndices[Right],
-                handFilterDistanceSq[Right]
-        );
+        //thumbNormals(
+        //        rhJoints[HandJointIndex::ThumbTip].translationInRig,
+        //        rhJoints[HandJointIndex::ThumbDistal].translationInRig,
+        //        rhJoints[HandJointIndex::ThumbProximal].translationInRig,
+        //        rnTDir, THUMB_RADIUS, true,
+        //        handMesh[Right], handMeshIndices[Right],
+        //        handFilterDistanceSq[Right]
+        //);
     }
 
     //input.hands[HandIndex::Left].joints[HandJointIndex::Wrist].translationInRig
