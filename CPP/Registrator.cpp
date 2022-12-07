@@ -172,6 +172,7 @@ void Registrator::update_pcd(const std::shared_ptr<open3d::geometry::PointCloud>
 }
 
 void Registrator::saveReconstructedMesh(const std::string &save_path) const {
+    if (!m_pcd) return;
     std::shared_ptr<open3d::geometry::TriangleMesh> mesh;
     std::vector<double> densities;
     m_pcd->EstimateNormals();

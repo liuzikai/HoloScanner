@@ -194,7 +194,7 @@ void TerminalSocketBase::handleRecv(const boost::system::error_code &error, size
      */
 
 
-    ssize_t i = recvOffset;
+    size_t i = recvOffset;
     recvOffset += numBytes;  // move forward
     downloadBytes += numBytes;
 

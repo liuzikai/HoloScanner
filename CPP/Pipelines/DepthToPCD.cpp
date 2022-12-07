@@ -84,7 +84,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
     RawDataFrame rawDataFrame;
 
-    static int warm_up_frame = 20;
+    static int warm_up_frame = 0;
 
     if (!depthProcessor) {
         DirectX::XMMATRIX ahatExtrinsics;
@@ -95,6 +95,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         std::cout << "Create DepthProcessor with AHAT extrinsics and LUT" << std::endl;
     }
 
+    bool pcdUpdated = false;
     bool redraw = false;
 
     if (rawDataSource) {
@@ -117,13 +118,19 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         if(tcpStreamingSource.receivedStopSignal()) {
             std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
             registrator.saveReconstructedMesh("final_mesh.ply");
+
+            viewer.data().clear();
+            viewer.data().add_points(ReconstructedPCD, Eigen::RowVector3d(1, 1, 1));
+            tcpStreamingSource.sendReconstructedPCD(Eigen::RowVector3d(1, 1, 1), *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
+
             registrator.reset();
             tcpStreamingSource.resetStopSignal();
             depthProcessor.reset(nullptr);
+            warm_up_frame = 20;
             return false;
         }
 
-        bool pcdUpdated = false;
+
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
             hasDebugHand = depthProcessor->getNextHandDebugFrame(handTimestamp, debugHandFrame);
@@ -131,7 +138,6 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
             std::cout << "[PCD] " << pcd.size() << std::endl;
 #endif
             pcdUpdated = true;
-            redraw = true;
 
         } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
 
@@ -145,21 +151,23 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
         }
     }
 
+    // Display Registration
+    Eigen::RowVector3d pointColor = merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 0.5, 0);
+
+    if (pcdUpdated && registrator.getReconstructedPCDInEigenFormat(ReconstructedPCD)) {
+        std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = "
+                  << merge_successful << std::endl;
+        viewer.data().add_points(ReconstructedPCD, pointColor);
+        tcpStreamingSource.sendReconstructedPCD(pointColor, *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
+        redraw = true;
+    }
+
     if (redraw) {
         viewer.data().clear();
 
         // PCD
         {
-            // Display Registration
-            Eigen::RowVector3d pointColor = merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 0.5, 0);
 
-            if (registrator.getReconstructedPCDInEigenFormat(ReconstructedPCD)) {
-                std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = "
-                          << merge_successful << std::endl;
-                viewer.data().add_points(ReconstructedPCD, pointColor);
-                tcpStreamingSource.sendReconstructedPCD(pointColor, *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
-
-            }
 
             //Send merged point cloud
             // TODO: global variable...

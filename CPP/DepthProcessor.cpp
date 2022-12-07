@@ -242,6 +242,7 @@ void DepthProcessor::updateHandMesh(
         const float d2 = FINGER_SIZES[b[1]];
         DirectX::XMVECTOR origin = hand.joints[b[0]].translationInRig;
         DirectX::XMVECTOR boneDirection = hand.joints[b[1]].translationInRig - origin;
+        // FIXME: zero w
         float boneLength = XMVectorGetX(XMVector3Length(boneDirection));
 
         if (boneLength < std::numeric_limits<float>::epsilon()) {

@@ -41,7 +41,7 @@ public:
     size_t stdLogIndex = 0;
     static constexpr size_t STD_LOG_SIZE = 10;
 
-    static constexpr float MAX_STD_VAL = 14500.0f; // squared value on purpose
+    static constexpr float MAX_STD_VAL = 14500.0f;  // squared value on purpose
 
 
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;
