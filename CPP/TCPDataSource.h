@@ -24,7 +24,10 @@ public:
 
     bool getNextPCD(timestamp_t &timestamp, PCD &pcd) override;
 
-    bool sendReconstructedPCD(const PCD &pcd, const DirectX::XMMATRIX &rig2world) override;
+    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
+                              const DirectX::XMMATRIX &rig2world) override;
+
+    bool receivedStopSignal() const { return m_stopSignalReceived; }
 
 private:
 
@@ -48,6 +51,8 @@ private:
 
     std::queue<std::pair<timestamp_t, PCD>> pcdFrames;
     std::mutex pcdMutex;
+	
+	m_stopSignalReceived = false;
 };
 
 

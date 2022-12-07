@@ -31,9 +31,13 @@ TCPDataSource::~TCPDataSource() {
     if (tcpIOThread) tcpIOThread->join();
 }
 
-bool TCPDataSource::sendReconstructedPCD(const PCD &pcd, const DirectX::XMMATRIX &rig2world) {
+bool TCPDataSource::sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
+                                         const DirectX::XMMATRIX &rig2world) {
     std::vector<float> data;
-    data.reserve(pcd.size() * 3);
+    data.reserve(3 + pcd.size() * 3);
+    data.emplace_back((float) pointColor(0));
+    data.emplace_back((float) pointColor(1));
+    data.emplace_back((float) pointColor(2));
     for (const auto &e : pcd) {
         DirectX::XMVECTOR v = EigenVector3dToXMVector(e);
         v = DirectX::XMVector3Transform(v, rig2world);
@@ -80,7 +84,16 @@ bool TCPDataSource::getNextPCD(timestamp_t &timestamp, PCD &pcd) {
 
 void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, size_t size) {
 
-    if (name == "e") {  // AHAT extrinsics
+    if (name == "s") {  // Stop signal
+        static constexpr size_t EXPECTED_SIZE = 0;
+        if (size != EXPECTED_SIZE) {
+            std::cerr << "Invalid Stop signal. Size: " << size << ", expecting " << EXPECTED_SIZE << std::endl;
+            return;
+        }
+
+        m_stopSignalReceived = true;
+
+    } else if (name == "e") {  // AHAT extrinsics
         static constexpr size_t EXPECTED_SIZE = 16 * sizeof(float);
         if (size != EXPECTED_SIZE) {
             std::cerr << "Invalid AHAT extrinsics size: " << size << ", expecting " << EXPECTED_SIZE << std::endl;

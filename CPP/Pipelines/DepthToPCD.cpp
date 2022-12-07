@@ -47,7 +47,8 @@ public:
         }
     }
 
-    bool sendReconstructedPCD(const PCD &pcd, const DirectX::XMMATRIX &rig2world) override {
+    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
+                              const DirectX::XMMATRIX &rig2world) override {
         // FIXME: should not be here
         return false;
     }
@@ -113,6 +114,12 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
     bool merge_successful = false;
     if (depthProcessor) {
+        if(depthProcessor->receivedStopSignal()) {
+            std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
+            registrator.saveReconstructedMesh("final_mesh.ply");
+            //TODO what to do here? exit(0)? reset()?
+        }
+
         bool pcdUpdated = false;
         do {
             if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
@@ -140,15 +147,18 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
         // PCD
         {
-            //Display Registration
+            // Display Registration
+            Eigen::RowVector3d pointColor = merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 0.5, 0);
+
             if (registrator.getReconstructedPCDInEigenFormat(ReconstructedPCD)) {
-                std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = " << merge_successful << std::endl;
-                viewer.data().add_points(ReconstructedPCD,
-                                         merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 1, 0));
-                //Send merged point cloud
-                // TODO: global variable...
-                tcpStreamingSource.sendReconstructedPCD(*registrator.getReconstructedPCD(), rawDataFrame.rig2world);
+                std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = "
+                          << merge_successful << std::endl;
+                viewer.data().add_points(ReconstructedPCD, pointColor);
+                tcpStreamingSource.sendReconstructedPCD(pointColor, *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
             }
+
+            //Send merged point cloud
+            // TODO: global variable...
 
             // Set camera on first frame
             if (warm_up_frame > 0 && pcd.size() > 200) {

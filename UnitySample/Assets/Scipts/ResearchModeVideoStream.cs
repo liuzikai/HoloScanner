@@ -446,6 +446,33 @@ public class ResearchModeVideoStream : MonoBehaviour
         startRealtimePreview = false;
     }
 
+    public void ToggleRawDataStreamingEvent__() {
+        if (!RawDataStreaming) {
+            if (tcpClient.Connected) {
+                RawDataStreaming = true;
+                AHATLUTSent = false;
+                RawDataStreamingLED.material.color = Color.yellow;
+
+#if ENABLE_WINMD_SUPPORT
+                var data = new List<float>();
+                SerializeMatrix4x4(data, researchMode.GetDepthExtrinsics());
+                tcpClient.SendFloatAsync("e", data.ToArray(), false);  // must not be dropped
+#endif
+            }
+
+        } else {
+            RawDataStreaming = false;
+            RawDataStreamingLED.material.color = Color.red;
+            if (tcpClient.Connected) {
+#if ENABLE_WINMD_SUPPORT
+                //Send stop signal
+                var data = new List<float>();
+                tcpClient.SendFloatAsync("s", data.ToArray(), false);  // must not be dropped
+#endif
+            }
+        }
+    }
+
     public void ToggleRawDataStreamingEvent() {
         if (!RawDataStreaming) 
         {
