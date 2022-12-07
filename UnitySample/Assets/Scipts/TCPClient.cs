@@ -69,7 +69,7 @@ public class TCPClient : MonoBehaviour
     public DataWriter dw;
     public DataReader dr;
 
-    private Task<float[]> readingTask = null;
+    private Task readingTask = null;
 
     private async void StartConnection()
     {
@@ -116,7 +116,7 @@ public class TCPClient : MonoBehaviour
 
 
             dr = new DataReader(socket.InputStream);
-            dr.InputStreamOptions = InputStreamOptions.Partial;
+            dr.InputStreamOptions = InputStreamOptions.None;
             dr.UnicodeEncoding = Windows.Storage.Streams.UnicodeEncoding.Utf8;
             dr.ByteOrder = Windows.Storage.Streams.ByteOrder.LittleEndian;
 
@@ -253,7 +253,7 @@ public class TCPClient : MonoBehaviour
         PendingMessageCount--;
     }
 
-    // TODO: [Zikai] the convention is inconsistent with above, but we are not using them for now
+    // NOTE: [Zikai] the convention is inconsistent with above, but we are not using them anyway for now
     public async void SendSpatialImageAsync(byte[] LFImage, byte[] RFImage, long ts_left, long ts_right)
     {
         if (PendingMessageCount >= MaxPendingMessageCount) return;
@@ -316,46 +316,48 @@ public class TCPClient : MonoBehaviour
         PendingMessageCount--;
     }
 
-    private async Task<float[]> ReadPointCloudFromPC(DataReader dr) 
+    private async Task ReadPointCloudFromPC(DataReader dr) 
     {
         try 
         {
-            videoStream.text.text = "0 " + dr.UnconsumedBufferLength.ToString() + " ";
+            while (dr.UnconsumedBufferLength > 0)
+            {
+                await dr.LoadAsync(1);
+                if (dr.ReadByte() == Preamble) break;
+            }
+
             await dr.LoadAsync(1);
-            videoStream.text.text += "1 ";
-            if (dr.ReadByte() != Preamble) return null;
-            videoStream.text.text += "2 ";
-            await dr.LoadAsync(1);
-            videoStream.text.text += "3 ";
-            if (dr.ReadByte() != (byte) PackageType.Bytes) return null;
-            videoStream.text.text += "4 ";
+            if (dr.ReadByte() != (byte) PackageType.Bytes) return;
+
             await dr.LoadAsync(2);  // NOTICE: here we hard code the name to be length-1 string
-            videoStream.text.text += "5 " + dr.ReadByte().ToString();
+            if (dr.ReadByte() != (byte) 'P') return;
             dr.ReadByte();
+
             await dr.LoadAsync(4);
-            videoStream.text.text += "6 ";
             uint bytesToRead = dr.ReadUInt32();
-            videoStream.text.text += "7 " + bytesToRead.ToString();
-            if (bytesToRead != 0)
-            {
-                await dr.LoadAsync(bytesToRead);
-                videoStream.text.text += "8 ";
-                var bytes = new byte[bytesToRead];
-                dr.ReadBytes(bytes);
-                videoStream.text.text += "9 ";
-                return BytesToFloat(bytes);
+            await dr.LoadAsync(bytesToRead);
+
+            // Sanity check
+            if (bytesToRead < 3 * sizeof(float) || bytesToRead % sizeof(float) != 0) {
+                videoStream.text.text = "Invalid float array size (bytes): " + bytesToRead.ToString();
+                Debug.Log(videoStream.text.text);
+                return;
             }
-            else 
-            {
-                videoStream.text.text += "X ";
-                return null;
-            }
+
+            // Point color
+            Color pointColor = new Color(dr.ReadSingle(), dr.ReadSingle(), dr.ReadSingle());
+            videoStream.pointColor = pointColor;
+            bytesToRead -= 3 * sizeof(float);
+
+            // Points
+            var bytes = new byte[bytesToRead];
+            dr.ReadBytes(bytes);
+            videoStream.RenderPointCloud(videoStream.FloatToVector3(BytesToFloat(bytes))); 
         }
         catch (Exception ex)
         {
-            videoStream.text.text += ex.Message;
-            Debug.Log(ex.Message);
-            return null;
+            videoStream.text.text = ex.Message;
+            Debug.Log(videoStream.text.text);
         }
     }
 #endif
@@ -365,27 +367,9 @@ public class TCPClient : MonoBehaviour
 #if WINDOWS_UWP
         if (Connected && dr != null) 
         {
-            if (readingTask != null) 
+            if (readingTask == null || readingTask.IsCompleted) 
             {
-                if (readingTask.IsCompleted) 
-                {
-                    videoStream.text.text += "Y ";
-                    if (readingTask.Status == TaskStatus.RanToCompletion) 
-                    {
-                        videoStream.text.text += "Z ";
-                        float[] f = readingTask.Result;
-                        if (f != null) 
-                        {
-                            videoStream.text.text += "W " + f.Length.ToString();
-                            videoStream.RenderPointCloud(videoStream.FloatToVector3(f));
-                        }
-                    }
-                    readingTask = null;
-                }
-            } 
-            else 
-            {
-                readingTask = ReadPointCloudFromPC(dr);
+                readingTask = ReadPointCloudFromPC(dr);  // restart async receiving
             }
         }
 #endif

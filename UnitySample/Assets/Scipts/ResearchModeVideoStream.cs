@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 using System.Runtime.InteropServices;
+using TMPro;
 
 #if ENABLE_WINMD_SUPPORT
 using HL2UnityPlugin;
@@ -56,7 +57,7 @@ public class ResearchModeVideoStream : MonoBehaviour
     private Texture2D RFMediaTexture = null;
     private byte[] RFFrameData = null;
 
-    public UnityEngine.UI.Text text;
+    public TMP_Text text;
 
     public GameObject pointCloudRendererGo;
     public Color pointColor = Color.white;
@@ -443,6 +444,33 @@ public class ResearchModeVideoStream : MonoBehaviour
         researchMode.StopAllSensorDevice();
 #endif
         startRealtimePreview = false;
+    }
+
+    public void ToggleRawDataStreamingEvent__() {
+        if (!RawDataStreaming) {
+            if (tcpClient.Connected) {
+                RawDataStreaming = true;
+                AHATLUTSent = false;
+                RawDataStreamingLED.material.color = Color.yellow;
+
+#if ENABLE_WINMD_SUPPORT
+                var data = new List<float>();
+                SerializeMatrix4x4(data, researchMode.GetDepthExtrinsics());
+                tcpClient.SendFloatAsync("e", data.ToArray(), false);  // must not be dropped
+#endif
+            }
+
+        } else {
+            RawDataStreaming = false;
+            RawDataStreamingLED.material.color = Color.red;
+            if (tcpClient.Connected) {
+#if ENABLE_WINMD_SUPPORT
+                //Send stop signal
+                var data = new List<float>();
+                tcpClient.SendFloatAsync("s", data.ToArray(), false);  // must not be dropped
+#endif
+            }
+        }
     }
 
     public void ToggleRawDataStreamingEvent() {
