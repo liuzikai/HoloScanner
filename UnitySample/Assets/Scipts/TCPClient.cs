@@ -68,6 +68,9 @@ public class TCPClient : MonoBehaviour
     StreamSocket socket = null;
     public DataWriter dw;
     public DataReader dr;
+
+    private Task<float[]> readingTask = null;
+
     private async void StartConnection()
     {
         if (ConnectionStatusLED.material.color == Color.yellow) return;  // already trying to connect
@@ -81,7 +84,7 @@ public class TCPClient : MonoBehaviour
                 socket = new StreamSocket();
 
                 var hostName = new Windows.Networking.HostName(hostIPAddress);
-                ConnectButtonText.text = "Trying " + ConnectedHostIP;
+                ConnectButtonText.text = "Trying " + hostIPAddress;
 
                 var cts = new CancellationTokenSource();
                 cts.CancelAfter(2000);  // cancel after 2 seconds
@@ -135,6 +138,8 @@ public class TCPClient : MonoBehaviour
         if (videoStream.InteractionStreaming) videoStream.ToggleInteractionStreamingEvent();
         if (videoStream.PointCloudStreaming) videoStream.TogglePointCloudStreamingEvent();
 
+        Connected = false;
+
         dw?.DetachStream();
         dw?.Dispose();
         dw = null;
@@ -143,8 +148,9 @@ public class TCPClient : MonoBehaviour
         dr?.Dispose();
         dr = null;
 
+        readingTask = null;  // discard the task
+
         socket?.Dispose();
-        Connected = false;
         ConnectionStatusLED.material.color = Color.red;
         ConnectButtonText.text = "Connect to Server";
 
@@ -310,7 +316,80 @@ public class TCPClient : MonoBehaviour
         PendingMessageCount--;
     }
 
+    private async Task<float[]> ReadPointCloudFromPC(DataReader dr) 
+    {
+        try 
+        {
+            videoStream.text.text = "0 " + dr.UnconsumedBufferLength.ToString() + " ";
+            await dr.LoadAsync(1);
+            videoStream.text.text += "1 ";
+            if (dr.ReadByte() != Preamble) return null;
+            videoStream.text.text += "2 ";
+            await dr.LoadAsync(1);
+            videoStream.text.text += "3 ";
+            if (dr.ReadByte() != (byte) PackageType.Bytes) return null;
+            videoStream.text.text += "4 ";
+            await dr.LoadAsync(2);  // NOTICE: here we hard code the name to be length-1 string
+            videoStream.text.text += "5 " + dr.ReadByte().ToString();
+            dr.ReadByte();
+            await dr.LoadAsync(4);
+            videoStream.text.text += "6 ";
+            uint bytesToRead = dr.ReadUInt32();
+            videoStream.text.text += "7 " + bytesToRead.ToString();
+            if (bytesToRead != 0)
+            {
+                await dr.LoadAsync(bytesToRead);
+                videoStream.text.text += "8 ";
+                var bytes = new byte[bytesToRead];
+                dr.ReadBytes(bytes);
+                videoStream.text.text += "9 ";
+                return BytesToFloat(bytes);
+            }
+            else 
+            {
+                videoStream.text.text += "X ";
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            videoStream.text.text += ex.Message;
+            Debug.Log(ex.Message);
+            return null;
+        }
+    }
 #endif
+
+    void LateUpdate()
+    {
+#if WINDOWS_UWP
+        if (Connected && dr != null) 
+        {
+            if (readingTask != null) 
+            {
+                if (readingTask.IsCompleted) 
+                {
+                    videoStream.text.text += "Y ";
+                    if (readingTask.Status == TaskStatus.RanToCompletion) 
+                    {
+                        videoStream.text.text += "Z ";
+                        float[] f = readingTask.Result;
+                        if (f != null) 
+                        {
+                            videoStream.text.text += "W " + f.Length.ToString();
+                            videoStream.RenderPointCloud(videoStream.FloatToVector3(f));
+                        }
+                    }
+                    readingTask = null;
+                }
+            } 
+            else 
+            {
+                readingTask = ReadPointCloudFromPC(dr);
+            }
+        }
+#endif
+    }
 
 
     #region Helper Function
@@ -325,6 +404,13 @@ public class TCPClient : MonoBehaviour
         byte[] floatInBytes = new byte[data.Length * sizeof(float)];
         System.Buffer.BlockCopy(data, 0, floatInBytes, 0, floatInBytes.Length);
         return floatInBytes;
+    }
+    float[] BytesToFloat(byte[] data)
+    {
+        if ((data.Length % sizeof(float)) != 0) return null;
+        float[] f = new float[data.Length / sizeof(float)];
+        System.Buffer.BlockCopy(data, 0, f, 0, data.Length);
+        return f;
     }
     #endregion
 

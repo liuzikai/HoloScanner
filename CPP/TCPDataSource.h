@@ -24,11 +24,13 @@ public:
 
     bool getNextPCD(timestamp_t &timestamp, PCD &pcd) override;
 
-    bool sendReconstructedPCD(const PCD& pcd) override;
+    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
+                              const DirectX::XMMATRIX &rig2world) override;
 
 private:
 
     static constexpr int PORT = 9090;
+    static constexpr int MAX_PENDING_FRAMES = 3;
 
     boost::asio::io_context tcpIOContext;
     std::thread *tcpIOThread = nullptr;

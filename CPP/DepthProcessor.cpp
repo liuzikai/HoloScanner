@@ -286,6 +286,8 @@ bool DepthProcessor::update(const RawDataFrame &input) {
         return false;  // tell the user of dropping frame
     }
 
+    if (pcdRawFrames.size() > MAX_PENDING_FRAMES) return true;
+
     handMesh[Left].clear();
     handMesh[Right].clear();
     handMeshIndices[Left].clear();

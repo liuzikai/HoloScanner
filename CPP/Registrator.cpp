@@ -11,6 +11,7 @@ using std::cout;
 using std::endl;
 
 std::unique_ptr<PCD> Registrator::getReconstructedPCD() const {
+    if (!m_pcd) return nullptr;
     PCD pcd;
     pcd.reserve(m_pcd->points_.size());
     for (const auto &p: m_pcd->points_) {
@@ -32,7 +33,7 @@ Eigen::Matrix4d Registrator::getTransformation(const geometry::PointCloud &sourc
                                                const geometry::PointCloud &target, Eigen::Matrix6d &InfoMat,
                                                const double kernel_param) const {
 
-    int nb_iterations = 1200;
+    int nb_iterations = 300;
 
     double voxel_size = 0.01;
     Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
@@ -190,19 +191,13 @@ bool Registrator::mergePCD(const PCD &pcd_)
 
     //Compute the transformation between the current and global point cloud
     Eigen::Matrix6d InfoMat;
-    double kernel_param = 0.01;
+    double kernel_param = 0.1;
     Eigen::Matrix4d T = getTransformation(pcd, *m_pcd, InfoMat, kernel_param);
 
     //Evaluate the registration
     bool success = isRegistrationSuccessful(pcd, T);
     //If not successful, keep the global point cloud as is, wait for the user to realign
-    if (!success) {
-        T = global_registration(pcd, *m_pcd, InfoMat, m_max_corr_dist_transformation, 0.01);
-        success = isRegistrationSuccessful(pcd, T);
-        if (!success)
-            return false;
-    }
-    
+    if (!success) return false;
 
 
     *m_pcd = m_pcd->Transform(T.inverse()); //Bring the global point cloud into the reference of the current frame

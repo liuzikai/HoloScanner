@@ -5,6 +5,7 @@
 #include <iostream>
 #include <ctime>
 #include "DirectXHelpers.h"
+#include "EigenHelpers.h"
 #include "TCPDataSource.h"
 
 TCPDataSource::TCPDataSource() :
@@ -30,10 +31,24 @@ TCPDataSource::~TCPDataSource() {
     if (tcpIOThread) tcpIOThread->join();
 }
 
-bool TCPDataSource::sendReconstructedPCD(const PCD& pcd) {
-    //TODO implement sending back to the Hololens
-    //socketServer.sendBytes(...);
-    return false;
+bool TCPDataSource::sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
+                                         const DirectX::XMMATRIX &rig2world) {
+    std::vector<float> data;
+    data.reserve(3 + pcd.size() * 3);
+    data.emplace_back((float) pointColor(0));
+    data.emplace_back((float) pointColor(1));
+    data.emplace_back((float) pointColor(2));
+    for (const auto &e : pcd) {
+        DirectX::XMVECTOR v = EigenVector3dToXMVector(e);
+        v = DirectX::XMVector3Transform(v, rig2world);
+        DirectX::XMFLOAT4 f;
+        DirectX::XMStoreFloat4(&f, v);
+        data.emplace_back((float) f.x / f.w);
+        data.emplace_back((float) f.y / f.w);
+        data.emplace_back((float) -f.z / f.w);
+    }
+    socketServer.sendBytes("P", reinterpret_cast<uint8_t *>(data.data()), data.size() * sizeof(float));
+    return true;
 }
 
 bool TCPDataSource::getAHATExtrinsics(DirectX::XMMATRIX &extrinsics) {
@@ -98,6 +113,14 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
         }
 
     } else if (name == "R") {  // raw data: AHAT depth + rig2world + interaction
+        {
+            std::lock_guard<std::mutex> lock(rawDataFrameMutex);
+            if (rawDataFrames.size() > MAX_PENDING_FRAMES) {
+                // std::cout << "Discard frames" << std::endl;
+                return;
+            }
+        }
+
         RawDataFrame frame;
 
         static constexpr size_t TIMESTAMP_SIZE = sizeof(timestamp_t);

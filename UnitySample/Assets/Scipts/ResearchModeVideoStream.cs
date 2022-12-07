@@ -367,13 +367,8 @@ public class ResearchModeVideoStream : MonoBehaviour
             
             if (pointCloud.Length > 0)
             {
-                int pointCloudLength = pointCloud.Length / 3;
-                Vector3[] pointCloudVector3 = new Vector3[pointCloudLength];
-                for (int i = 0; i < pointCloudLength; i++)
-                {
-                    pointCloudVector3[i] = new Vector3(pointCloud[3 * i], pointCloud[3 * i + 1], pointCloud[3 * i + 2]);
-                }
-                if (depthSensorMode == DepthSensorMode.ShortThrow) 
+                Vector3[] pointCloudVector3 = FloatToVector3(pointCloud);
+                /* if (depthSensorMode == DepthSensorMode.ShortThrow) 
                 {
                     text.text = "AHAT ";
                 } 
@@ -385,11 +380,11 @@ public class ResearchModeVideoStream : MonoBehaviour
                 if (tcpClient != null)
                 {
                     text.text += "\n"+ "TCP Pending: " + tcpClient.PendingMessageCount.ToString();
-                }
+                } */
 
                 if (renderPointCloud)
                 {
-                    pointCloudRenderer.Render(pointCloudVector3, pointColor);
+                    RenderPointCloud(pointCloudVector3);
                 }
 
                 // Send point cloud
@@ -399,6 +394,22 @@ public class ResearchModeVideoStream : MonoBehaviour
                 }
             }
         }
+    }
+
+    public Vector3[] FloatToVector3(float[] pointCloud)
+    {
+        int pointCloudLength = pointCloud.Length / 3;
+        Vector3[] pointCloudVector3 = new Vector3[pointCloudLength];
+        for (int i = 0; i < pointCloudLength; i++)
+        {
+            pointCloudVector3[i] = new Vector3(pointCloud[3 * i], pointCloud[3 * i + 1], pointCloud[3 * i + 2]);
+        }
+        return pointCloudVector3;
+    }
+
+    public void RenderPointCloud(Vector3[] pointCloudVector3) 
+    {
+        pointCloudRenderer.Render(pointCloudVector3, pointColor);
     }
 #endif
 
@@ -415,11 +426,14 @@ public class ResearchModeVideoStream : MonoBehaviour
         renderPointCloud = !renderPointCloud;
         if (renderPointCloud)
         {
-            pointCloudRendererGo.SetActive(true);
+            // pointCloudRendererGo.SetActive(true);
         }
         else
         {
-            pointCloudRendererGo.SetActive(false);
+            // pointCloudRendererGo.SetActive(false);
+#if WINDOWS_UWP
+            RenderPointCloud(new Vector3[]{});
+#endif
         }
     }
 

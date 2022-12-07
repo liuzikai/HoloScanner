@@ -47,11 +47,14 @@ public:
         }
     }
 
-    bool sendReconstructedPCD(const PCD& pcd) override {
-        //TODO implement (probably not necessary actually since we are already visualizing locally)
+    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
+                              const DirectX::XMMATRIX &rig2world) override {
+        // FIXME: should not be here
         return false;
     }
 };
+
+TCPDataSource tcpStreamingSource;
 
 Registrator registrator;
 
@@ -138,15 +141,18 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
         // PCD
         {
-            //Display Registration
+            // Display Registration
+            Eigen::RowVector3d pointColor = merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 0.5, 0);
+
             if (registrator.getReconstructedPCDInEigenFormat(ReconstructedPCD)) {
-                std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = " << merge_successful << std::endl;
-                viewer.data().add_points(ReconstructedPCD,
-                                         merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 1, 0));
-                //Send merged point cloud
-                if (depthProcessor)
-                    depthProcessor->sendReconstructedPCD(*registrator.getReconstructedPCD());
+                std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = "
+                          << merge_successful << std::endl;
+                viewer.data().add_points(ReconstructedPCD, pointColor);
+                tcpStreamingSource.sendReconstructedPCD(pointColor, *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
             }
+
+            //Send merged point cloud
+            // TODO: global variable...
 
             // Set camera on first frame
             if (warm_up_frame > 0 && pcd.size() > 200) {
@@ -255,7 +261,6 @@ int main() {
     std::ios::sync_with_stdio(false);
 
 #ifdef BOOST_AVAILABLE
-    TCPDataSource tcpStreamingSource;
     discardDelayedFrames = true;
     rawDataSource = static_cast<RawDataSource *>(&tcpStreamingSource);
 #else

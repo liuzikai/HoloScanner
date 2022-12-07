@@ -59,10 +59,10 @@ public:
 
 private:
     std::shared_ptr<open3d::geometry::PointCloud> m_pcd;
-    float m_max_corr_dist_transformation = 0.008;
-    float m_max_corr_dist_evaluation = 0.008;
+    float m_max_corr_dist_transformation = 0.004;
+    float m_max_corr_dist_evaluation = 0.007;
     float m_max_rmse = 0.004;
-    float m_min_fitness = 0.75;
+    float m_min_fitness = 0.97;
 
     /**
      * @brief Construct a new is Registration Successful object
