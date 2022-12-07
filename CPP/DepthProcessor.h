@@ -80,12 +80,12 @@ public:
             0.05,   /* ThumbMetacarpal */
             0.04,   /* ThumbProximal */
             0.03,   /* ThumbDistal */
-            0.025,  /* ThumbTip */
+            0.022,  /* ThumbTip */
             0.04,   /* IndexMetacarpal */
             0.03,   /* IndexProximal */
             0.02,   /* IndexIntermediate */
             0.02,   /* IndexDistal */
-            0.015,  /* IndexTip */
+            0.012,  /* IndexTip */
             0.04,   /* MiddleMetacarpal */
             0.02,   /* MiddleProximal */
             0.02,   /* MiddleIntermediate */

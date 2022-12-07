@@ -317,16 +317,16 @@ bool DepthProcessor::update(const RawDataFrame &input) {
                 handFilterDistanceSq[Left]
         );
 
-        // left index finger
-        fingerNormals(
-                lhJoints[HandJointIndex::IndexTip].translationInRig,
-                lhJoints[HandJointIndex::IndexDistal].translationInRig,
-                lhJoints[HandJointIndex::IndexIntermediate].translationInRig,
-                lhJoints[HandJointIndex::IndexProximal].translationInRig,
-                lnDir, lnTDir, INDEX_RADIUS, false, true,
-                handMesh[Left], handMeshIndices[Left],
-                handFilterDistanceSq[Left]
-        );
+        //// left index finger
+        //fingerNormals(
+        //        lhJoints[HandJointIndex::IndexTip].translationInRig,
+        //        lhJoints[HandJointIndex::IndexDistal].translationInRig,
+        //        lhJoints[HandJointIndex::IndexIntermediate].translationInRig,
+        //        lhJoints[HandJointIndex::IndexProximal].translationInRig,
+        //        lnDir, lnTDir, INDEX_RADIUS, false, true,
+        //        handMesh[Left], handMeshIndices[Left],
+        //        handFilterDistanceSq[Left]
+        //);
 
         // left middle finger
         fingerNormals(
@@ -383,16 +383,16 @@ bool DepthProcessor::update(const RawDataFrame &input) {
                 handFilterDistanceSq[Right]
         );
 
-        // right index finger
-        fingerNormals(
-                rhJoints[HandJointIndex::IndexTip].translationInRig,
-                rhJoints[HandJointIndex::IndexDistal].translationInRig,
-                rhJoints[HandJointIndex::IndexIntermediate].translationInRig,
-                rhJoints[HandJointIndex::IndexProximal].translationInRig,
-                rnDir, rnTDir, INDEX_RADIUS, true, true,
-                handMesh[Right], handMeshIndices[Right],
-                handFilterDistanceSq[Right]
-        );
+        //// right index finger
+        //fingerNormals(
+        //        rhJoints[HandJointIndex::IndexTip].translationInRig,
+        //        rhJoints[HandJointIndex::IndexDistal].translationInRig,
+        //        rhJoints[HandJointIndex::IndexIntermediate].translationInRig,
+        //        rhJoints[HandJointIndex::IndexProximal].translationInRig,
+        //        rnDir, rnTDir, INDEX_RADIUS, true, true,
+        //        handMesh[Right], handMeshIndices[Right],
+        //        handFilterDistanceSq[Right]
+        //);
 
         // right middle finger
         fingerNormals(
@@ -491,6 +491,7 @@ bool DepthProcessor::update(const RawDataFrame &input) {
 
             // Filter on std deviation and depth clipping
             if (dev < MAX_STD_VAL && depth > depthNearClip && depth < depthFarClip) {
+            //if (depth > depthNearClip && depth < depthFarClip) {
                 auto pointInCam = ((float) depth / 1000.0f) * lut[ind];
                 auto pointInRig = XMVector3Transform(pointInCam, cam2rig);
                 pointInRig /= XMVectorGetW(pointInRig);

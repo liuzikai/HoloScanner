@@ -33,11 +33,15 @@ Eigen::Matrix4d Registrator::getTransformation(const geometry::PointCloud &sourc
                                                const geometry::PointCloud &target, Eigen::Matrix6d &InfoMat,
                                                const double kernel_param) const {
 
-    int nb_iterations = 1000;
+<<<<<<< HEAD
+    int nb_iterations = 1200;
+=======
+    int nb_iterations = 600;
+>>>>>>> origin/MR
 
     double voxel_size = 0.01;
     Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 3; ++i) {
         auto source_down = source.VoxelDownSample(voxel_size);
         source_down->EstimateNormals(open3d::geometry::KDTreeSearchParamHybrid(
                 voxel_size * 2.0, 30));
@@ -122,7 +126,7 @@ bool Registrator::mergePCD(const PCD &pcd_, std::vector<DirectX::XMVECTOR> handM
 bool Registrator::mergePCD(const PCD &pcd_) 
 #endif
 {
-    if (pcd_.size() < 1000) return false;
+    if (pcd_.size() < 500) return false;
     auto pcd = geometry::PointCloud(pcd_);
     if (m_pcd == nullptr) { //First registration is always successful as it initializes the point cloud
         m_pcd = std::make_shared<geometry::PointCloud>(pcd);
@@ -144,12 +148,11 @@ bool Registrator::mergePCD(const PCD &pcd_)
     //pcd = *pcd.SelectByIndex(index);
 
 #ifdef USE_DBSCAN
-    std::vector<size_t> index = std::get<1>(pcd.RemoveStatisticalOutliers(16, 0.4));
+    std::vector<size_t> index = std::get<1>(pcd.RemoveStatisticalOutliers(16, 0.8));
     pcd = *pcd.SelectByIndex(index);
-    std::vector<int> labels = pcd.ClusterDBSCAN(0.005, 16);
+    std::vector<int> labels = pcd.ClusterDBSCAN(0.005, 4);
     std::set<int> labels_unique;
-    size_t lSize = labels.size();
-    for (int i = 0; i < lSize; ++i) {
+    for (int i = 0; i < labels.size(); ++i) {
         if (labels[i] >= 0) {
             labels_unique.insert(labels[i]);
         }
@@ -168,25 +171,13 @@ bool Registrator::mergePCD(const PCD &pcd_)
 
     hand_center = hand_center / (2*handMesh[0].size());
     // some recording for each cluster
-    size_t ulSize = labels_unique.size();
-    std::vector<size_t> labels_num(ulSize, 0);
-    std::vector<double> distances(ulSize, std::numeric_limits<double>::max());
+    std::vector<size_t> labels_num(labels_unique.size(), 0);
+    std::vector<double> distances(labels_unique.size(), std::numeric_limits<double>::max());
     std::vector<std::vector<size_t>> labels_index;
-    for (int i = 0; i < ulSize; ++i) {
+    for (int i = 0; i < labels_unique.size(); ++i) {
         labels_index.push_back(std::vector<size_t>());
     }
-    // labels_index has size ulSize
-    // labels has size lSize
-    // lSize <= ulSize
-    if (pcd_.size() != lSize) {
-        std::cout << "############################################" << std::endl;
-        std::cout << "############################################" << std::endl;
-        std::cout << "######### Noooooooooooooooooooooooo ########" << std::endl;
-        std::cout << "############################################" << std::endl;
-        std::cout << "############################################" << std::endl;
-    }
-
-    for (size_t i = 0; i < lSize; ++i) {
+    for (size_t i = 0; i < labels.size(); ++i) {
         if (labels[i] >= 0){
             double distance = (pcd_[i] - hand_center).squaredNorm();
             if(distance < distances[labels[i]]){
@@ -210,7 +201,13 @@ bool Registrator::mergePCD(const PCD &pcd_)
     //Evaluate the registration
     bool success = isRegistrationSuccessful(pcd, T);
     //If not successful, keep the global point cloud as is, wait for the user to realign
-    if (!success) return false;
+    if (!success) {
+        T = global_registration(pcd, *m_pcd, InfoMat, m_max_corr_dist_transformation, 0.01);
+        success = isRegistrationSuccessful(pcd, T);
+        if (!success)
+            return false;
+    }
+    
 
 
     *m_pcd = m_pcd->Transform(T.inverse()); //Bring the global point cloud into the reference of the current frame
