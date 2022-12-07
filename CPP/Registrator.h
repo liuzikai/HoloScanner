@@ -14,6 +14,7 @@
 
 
 //#define USE_DBSCAN
+#define FINAL_DBSCAN
 
 class Registrator {
 public:
@@ -65,6 +66,8 @@ private:
     float m_max_corr_dist_evaluation = 0.007;
     float m_max_rmse = 0.004;
     float m_min_fitness = 0.97;
+
+    void update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const;
 
     /**
      * @brief Construct a new is Registration Successful object
