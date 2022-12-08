@@ -15,15 +15,4 @@ class PCDSource {
 public:
 
     virtual bool getNextPCD(timestamp_t &timestamp, PCD &pcd) = 0;
-
-    /**
-     * @brief Send back the reconstructed PCD to the device
-     * 
-     * @param pcd the reconstructed PCD
-     * @param rig2world
-     * @return true if successfully sent
-     */
-    // FIXME: should not be here
-    virtual bool
-    sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd, const DirectX::XMMATRIX &rig2world) = 0;
 };

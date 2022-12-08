@@ -12,7 +12,9 @@
 
 class TCPDataSource : public RawDataSource, public PCDSource {
 public:
-    explicit TCPDataSource();
+
+    // NOTICE: stopCallBack will be called from another thread
+    explicit TCPDataSource(std::function<void()> stopCallBack);
 
     ~TCPDataSource();
 
@@ -24,14 +26,8 @@ public:
 
     bool getNextPCD(timestamp_t &timestamp, PCD &pcd) override;
 
-    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
-                              const DirectX::XMMATRIX &rig2world) override;
-
-    bool receivedStopSignal() const { return m_stopSignalReceived; }
-
-    void resetStopSignal() {
-        m_stopSignalReceived = false;
-    }
+    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const Eigen::MatrixXd &pcd,
+                              const DirectX::XMMATRIX &rig2world);
 
 private:
 
@@ -40,6 +36,8 @@ private:
 
     boost::asio::io_context tcpIOContext;
     std::thread *tcpIOThread = nullptr;
+
+    std::function<void()> stopCallBack;
 
     TerminalSocketServer socketServer;
 
@@ -55,8 +53,6 @@ private:
 
     std::queue<std::pair<timestamp_t, PCD>> pcdFrames;
     std::mutex pcdMutex;
-	
-	bool m_stopSignalReceived = false;
 };
 
 

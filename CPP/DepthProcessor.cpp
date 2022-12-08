@@ -242,7 +242,6 @@ void DepthProcessor::updateHandMesh(
         const float d2 = FINGER_SIZES[b[1]];
         DirectX::XMVECTOR origin = hand.joints[b[0]].translationInRig;
         DirectX::XMVECTOR boneDirection = hand.joints[b[1]].translationInRig - origin;
-        // FIXME: zero w
         float boneLength = XMVectorGetX(XMVector3Length(boneDirection));
 
         if (boneLength < std::numeric_limits<float>::epsilon()) {
@@ -503,7 +502,7 @@ bool DepthProcessor::update(const RawDataFrame &input) {
                     XMStoreFloat3(&f, pointInRig);
                     frame.second.push_back(f.x);
                     frame.second.push_back(f.y);
-                    frame.second.push_back(-f.z);
+                    frame.second.push_back(f.z);
                 }
             }
         }
@@ -512,11 +511,7 @@ bool DepthProcessor::update(const RawDataFrame &input) {
     // Save the data
     {
         std::lock_guard<std::mutex> lock(pcdMutex);
-        pcdRawFrames.emplace(std::move(frame));
-        auto mPair = std::make_pair(frame.first, handMesh);
-        auto iPair = std::make_pair(frame.first, handMeshIndices);
 
-        // not sure about all the moves here...
         HandDebugFrame hdFrame;
         hdFrame.timestamp = frame.first;
         hdFrame.lhMesh = std::move(handMesh[Left]);
@@ -524,6 +519,7 @@ bool DepthProcessor::update(const RawDataFrame &input) {
         hdFrame.rhMesh = std::move(handMesh[Right]);
         hdFrame.rhIndices = std::move(handMeshIndices[Right]);
 
+        pcdRawFrames.emplace(std::move(frame));
         handMeshDebugQueue.emplace(std::move(hdFrame));
     }
 

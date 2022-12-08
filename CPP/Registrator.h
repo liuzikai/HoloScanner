@@ -39,24 +39,19 @@ public:
 #else
     bool mergePCD(const PCD &pcd);
 #endif
-    /**
-     * @brief Returns the latest reconstruction result
-     * @return The point cloud reconstructed so far as a PCD type
-     */
-    std::unique_ptr<PCD> getReconstructedPCD() const;
 
     /**
      * @brief Same as getReconstructedPCD() but as a MatrixXd.
      * Used for local testing with libigl
      * @return The point cloud reconstructed so far as an Eigen Matrix
      */
-    bool getReconstructedPCDInEigenFormat(Eigen::MatrixXd &Mat) const;
+    bool getReconstructedPCDInEigenFormat(Eigen::MatrixXd &mat);
 
     /**
      * @brief Construct a mesh from the point cloud and save it to disk
      * @param save_path path to which the mesh should be saved
      */
-    void saveReconstructedMesh(const std::string &save_path) const;
+    void saveReconstructedMesh(const std::string &save_path);
 
     void reset();
 
@@ -66,6 +61,9 @@ private:
     float m_max_corr_dist_evaluation = 0.007;
     float m_max_rmse = 0.004;
     float m_min_fitness = 0.97;
+
+    Eigen::MatrixXd pcdMatrix;
+    std::mutex pcdMatrixLock;
 
     void update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const;
 
@@ -89,4 +87,6 @@ private:
     Eigen::Matrix4d getTransformation(const open3d::geometry::PointCloud &source,
                                       const open3d::geometry::PointCloud &target, Eigen::Matrix6d &InfoMat,
                                       double kernel_param) const;
+
+    void updatePCDMatrixFromPCD();
 };

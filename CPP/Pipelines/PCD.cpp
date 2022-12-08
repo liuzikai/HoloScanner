@@ -20,7 +20,7 @@
 #include "Registrator.h"
 #include "DirectXHelpers.h"
 
-TCPDataSource tcpStreamingSource;
+TCPDataSource tcpDataSource;
 
 bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     static timestamp_t pcdTimestamp;
@@ -31,12 +31,12 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
     bool updated = false;
 
-    if (tcpStreamingSource.getNextPCD(pcdTimestamp, pcd)) {
+    if (tcpDataSource.getNextPCD(pcdTimestamp, pcd)) {
         updated = true;
         /*std::cout << "[PCD] " << pcdTimestamp << std::endl;*/
     }
 
-    if (tcpStreamingSource.getNextRawDataFrame(interactionFrame)) {
+    if (tcpDataSource.getNextRawDataFrame(interactionFrame)) {
         updated = true;
         /*std::cout << "[INT] " << interationTimestamp
                   << " Left Hand Tracked: " << interactionFrame.hands[Left].tracked

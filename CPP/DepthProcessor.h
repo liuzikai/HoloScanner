@@ -41,7 +41,7 @@ public:
     size_t stdLogIndex = 0;
     static constexpr size_t STD_LOG_SIZE = 10;
 
-    static constexpr float MAX_STD_VAL = 14500.0f;  // squared value on purpose
+    static constexpr float MAX_STD_VAL = 15000.0f;  // squared value on purpose
 
 
     std::queue<std::pair<timestamp_t, PCDRaw>> pcdRawFrames;
@@ -104,7 +104,7 @@ public:
     };
     static_assert(sizeof(DepthProcessor::FINGER_SIZES) == HandJointIndexCount * sizeof(float), "FINGER_SIZES");
 
-    void wristNormals(
+    static void wristNormals(
             const DirectX::XMVECTOR &wrist,
             const DirectX::XMVECTOR &palm,
             const DirectX::XMVECTOR &indexMetacarpal,
@@ -118,7 +118,7 @@ public:
             std::vector<float> &filterDistanceSq
     );
 
-    void fingerNormals(
+    static void fingerNormals(
             const DirectX::XMVECTOR &tip,
             const DirectX::XMVECTOR &distal,
             const DirectX::XMVECTOR &intermediate,
@@ -133,7 +133,7 @@ public:
             std::vector<float> &filterDistanceSq
     );
 
-    void thumbNormals(
+    static void thumbNormals(
             const DirectX::XMVECTOR &tip,
             const DirectX::XMVECTOR &distal,
             const DirectX::XMVECTOR &proximal,
@@ -145,7 +145,7 @@ public:
             std::vector<float> &filterDistanceSq
     );
 
-    void updateHandMesh(
+    static void updateHandMesh(
             const Hand &hand,
             std::vector<DirectX::XMVECTOR> &vertices,
             std::vector<std::vector<int>> &indices,

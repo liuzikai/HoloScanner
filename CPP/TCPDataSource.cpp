@@ -4,11 +4,12 @@
 
 #include <iostream>
 #include <ctime>
+#include <utility>
 #include "DirectXHelpers.h"
 #include "EigenHelpers.h"
 #include "TCPDataSource.h"
 
-TCPDataSource::TCPDataSource() :
+TCPDataSource::TCPDataSource(std::function<void()> stopCallBack) :
         socketServer(tcpIOContext, PORT, [](auto s) {
             // Setup a server with automatic acceptance
             std::cout << "TerminalSocketServer: disconnected" << std::endl;
@@ -18,7 +19,8 @@ TCPDataSource::TCPDataSource() :
             boost::asio::executor_work_guard<boost::asio::io_context::executor_type> workGuard(
                     tcpIOContext.get_executor());
             tcpIOContext.run();  // this operation is blocking, until ioContext is deleted
-        })) {
+        })),
+        stopCallBack(std::move(stopCallBack)){
 
     socketServer.startAccept();
     socketServer.setCallbacks(nullptr,
@@ -31,15 +33,15 @@ TCPDataSource::~TCPDataSource() {
     if (tcpIOThread) tcpIOThread->join();
 }
 
-bool TCPDataSource::sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
+bool TCPDataSource::sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const Eigen::MatrixXd &pcd,
                                          const DirectX::XMMATRIX &rig2world) {
     std::vector<float> data;
     data.reserve(3 + pcd.size() * 3);
     data.emplace_back((float) pointColor(0));
     data.emplace_back((float) pointColor(1));
     data.emplace_back((float) pointColor(2));
-    for (const auto &e : pcd) {
-        DirectX::XMVECTOR v = EigenVector3dToXMVector(e);
+    for (int i = 0; i < pcd.rows(); i++) {
+        DirectX::XMVECTOR v = EigenVector3dToXMVector(pcd.row(i));
         v = DirectX::XMVector3Transform(v, rig2world);
         DirectX::XMFLOAT4 f;
         DirectX::XMStoreFloat4(&f, v);
@@ -91,8 +93,7 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
             return;
         }
 
-        m_stopSignalReceived = true;
-
+        stopCallBack();
     } else if (name == "e") {  // AHAT extrinsics
         static constexpr size_t EXPECTED_SIZE = 16 * sizeof(float);
         if (size != EXPECTED_SIZE) {

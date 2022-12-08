@@ -13,11 +13,7 @@
 
 #include <iostream>
 
-#ifdef BOOST_AVAILABLE
-
 #include "TCPDataSource.h"
-
-#endif
 
 #include "DepthProcessor.h"
 #include "DirectXHelpers.h"
@@ -38,237 +34,259 @@ public:
             pcd.clear();
             pcd.reserve(pcdRaw.size() / 3);
             for (size_t i = 0; i < pcdRaw.size() / 3; i++) {
-                // NOTICE: swapping x and y and both negated
-                pcd.emplace_back(-pcdRaw[i * 3 + 1], -pcdRaw[i * 3], pcdRaw[i * 3 + 2]);
+                // NOTICE: swapping x and y and all negated
+                pcd.emplace_back(-pcdRaw[i * 3 + 1], -pcdRaw[i * 3], -pcdRaw[i * 3 + 2]);
             }
             return true;
         } else {
             return false;
         }
     }
-
-    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const PCD &pcd,
-                              const DirectX::XMMATRIX &rig2world) override {
-        // FIXME: should not be here
-        return false;
-    }
 };
 
-TCPDataSource tcpStreamingSource;
+const Eigen::RowVector3d POINT_COLOR[2] = {
+        Eigen::RowVector3d(1, 0.5, 0),  // failed
+        Eigen::RowVector3d(1, 1, 1),    // succeeded
+};
 
-Registrator registrator;
+bool shouldExit = false;
+// Even without atomic, resetting more than once (very unlikely) is also not a problem
+bool depthProcessorShouldReset = false;
+bool registratorShouldReset = false;
+bool viewerShouldReset = false;
 
-Eigen::MatrixXd ReconstructedPCD;
-
-bool discardDelayedFrames = false;
-
-RawDataSource *rawDataSource = nullptr;
+TCPDataSource tcpDataSource([] {
+    // Stop callback
+    depthProcessorShouldReset = true;
+    registratorShouldReset = true;
+    viewerShouldReset = true;
+});
 
 std::unique_ptr<DepthProcessorWrapper> depthProcessor;
 
-static const Eigen::RowVector3d HAND_COLOR[HandIndexCount] = {Eigen::RowVector3d(0, 1, 0),
-                                                              Eigen::RowVector3d(1, 0, 0)};
-static const Eigen::RowVector3d HAND_MESH_COLOR[HandIndexCount] = {Eigen::RowVector3d(0, 1, 1),
-                                                                   Eigen::RowVector3d(1, 0, 1)};
-Eigen::MatrixXd BOTH_HANDS_EDGE_COLORS(48, 3);
+Registrator registrator;
 
-bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
-    // static to hold the latest data to redraw on tracking lost
-    static timestamp_t pcdTimestamp;
-    static PCD pcd;
-    static bool lostTracking = false;
+// Data exchanged between threads
 
-    static timestamp_t handTimestamp;
-    static HandDebugFrame debugHandFrame;
-    bool hasDebugHand = false;
+std::mutex handDebugFrameLock;
+bool handDebugFrameValid = false;
+HandDebugFrame handDebugFrame;
+bool handDebugFrameUpdated = false;
 
-    RawDataFrame rawDataFrame;
+std::mutex rig2WorldLock;
+DirectX::XMMATRIX rig2world;
 
-    static int warm_up_frame = 0;
+std::mutex reconstructedPCDLock;
+Eigen::MatrixXd reconstructedPCD;
+Eigen::RowVector3d reconstructedPCDColor;
+bool reconstructedPCDUpdated = false;
 
-    if (!depthProcessor) {
-        DirectX::XMMATRIX ahatExtrinsics;
-        std::vector<float> ahatLUT;
-        if (!rawDataSource || !rawDataSource->getAHATExtrinsics(ahatExtrinsics)) return false;
-        if (!rawDataSource || !rawDataSource->getAHATDepthLUT(ahatLUT)) return false;
-        depthProcessor = std::make_unique<DepthProcessorWrapper>(ahatExtrinsics, ahatLUT.data());
-        std::cout << "Create DepthProcessor with AHAT extrinsics and LUT" << std::endl;
-    }
+std::thread depthToPCDThread([] {
+    while (!shouldExit) {
+        if (depthProcessorShouldReset) {
+            depthProcessor = nullptr;
+            depthProcessorShouldReset = false;
+        }
 
-    bool pcdUpdated = false;
-    bool redraw = false;
+        if (!depthProcessor) {
+            DirectX::XMMATRIX ahatExtrinsics;
+            std::vector<float> ahatLUT;
+            if (!tcpDataSource.getAHATExtrinsics(ahatExtrinsics)) continue;
+            if (!tcpDataSource.getAHATDepthLUT(ahatLUT)) continue;
+            depthProcessor = std::make_unique<DepthProcessorWrapper>(ahatExtrinsics, ahatLUT.data());
+            // std::cout << "Create DepthProcessor with AHAT extrinsics and LUT" << std::endl;
+        }
 
-    if (rawDataSource) {
-        do {
-            if (!rawDataSource->getNextRawDataFrame(rawDataFrame)) break;
+        RawDataFrame rawDataFrame;
+        if (tcpDataSource.getNextRawDataFrame(rawDataFrame)) {
 #if 0
             std::cout << "[Raw] " << rawDataFrame.timestamp << "    lostTracking = " << lostTracking << std::endl;
 #endif
-        } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
+            depthProcessor->update(rawDataFrame);
 
-        bool newLostTracking = !depthProcessor->update(rawDataFrame);
-        if (newLostTracking != lostTracking) {
-            redraw = true;
+            // Save rig2world
+            {
+                std::lock_guard _(rig2WorldLock);
+                rig2world = rawDataFrame.rig2world;
+            }
         }
-        lostTracking = newLostTracking;
     }
+});
 
-    bool merge_successful = false;
-    if (depthProcessor) {
-        if(tcpStreamingSource.receivedStopSignal()) {
+/**
+ * Send reconstructed PCD and set shared variables to update the viewer
+ * @param objectPCD  NOTICE: will be std::moved
+ * @param color
+ */
+void sendAndViewReconstructedPCD(Eigen::MatrixXd &objectPCD, const Eigen::RowVector3d &color) {
+    // Send the PCD
+    // TODO: now rig2world is performed locally, but will be remotely
+    DirectX::XMMATRIX localRig2world;
+    {
+        std::lock_guard _(rig2WorldLock);
+        localRig2world = rig2world;
+    }
+    tcpDataSource.sendReconstructedPCD(color, objectPCD, localRig2world);
+
+    // Give the PCD to the viewer (safe to std::move since we don't need it anymore)
+    {
+        std::lock_guard _(reconstructedPCDLock);
+        reconstructedPCD = std::move(objectPCD);
+        reconstructedPCDColor = color;
+        reconstructedPCDUpdated = true;
+    }
+}
+
+std::thread registrationThread([] {
+    constexpr int WARM_UP_FRAME_COUNT = 20;
+
+    int warmUPFrameRemaining = WARM_UP_FRAME_COUNT;
+
+    int frameCounter = 0;
+    auto lastStatTime = std::chrono::steady_clock::now();
+
+    while (!shouldExit) {
+        if (registratorShouldReset) {
             std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
-            registrator.saveReconstructedMesh("final_mesh.ply");
 
-            viewer.data().clear();
-            viewer.data().add_points(ReconstructedPCD, Eigen::RowVector3d(1, 1, 1));
-            tcpStreamingSource.sendReconstructedPCD(Eigen::RowVector3d(1, 1, 1), *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
+            registrator.saveReconstructedMesh("FinalMesh.ply");  // change PCD
+
+            Eigen::MatrixXd objectPCD;
+            if (registrator.getReconstructedPCDInEigenFormat(objectPCD)) {
+                std::cout << "[FinalPCD] " << objectPCD.size() << std::endl;
+                sendAndViewReconstructedPCD(objectPCD, Eigen::RowVector3d(0, 0.8, 1));
+            } else {
+                std::cout << "No reconstructed PCD available" << std::endl;
+            }
 
             registrator.reset();
-            tcpStreamingSource.resetStopSignal();
-            depthProcessor.reset(nullptr);
-            warm_up_frame = 20;
-            return false;
+            registratorShouldReset = false;
         }
 
+        if (!depthProcessor) continue;
 
-        do {
-            if (!depthProcessor->getNextPCD(pcdTimestamp, pcd)) break;
-            hasDebugHand = depthProcessor->getNextHandDebugFrame(handTimestamp, debugHandFrame);
+        auto now = std::chrono::steady_clock::now();
+        auto escapedMS = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastStatTime).count();
+        if (escapedMS >= 1000) {
+            std::cout << "Frame rate: " << frameCounter << std::endl;
+            frameCounter = 0;
+            lastStatTime = now;
+        }
+
+        timestamp_t pcdTimestamp;
+        PCD pcd;
+        if (depthProcessor->getNextPCD(pcdTimestamp, pcd)) {
 #if 1
             std::cout << "[PCD] " << pcd.size() << std::endl;
 #endif
-            pcdUpdated = true;
 
-        } while (discardDelayedFrames);  // continue the loop if discardDelayedFrames
+            // Get hand debug frame for visualizer
+            {
+                std::lock_guard _(handDebugFrameLock);
+                timestamp_t handDebugFrameTimestamp;
+                handDebugFrameValid = depthProcessor->getNextHandDebugFrame(handDebugFrameTimestamp, handDebugFrame);
+                handDebugFrameUpdated = true;
+            }
 
-        //merge current pcd with previous data
-        if (pcdUpdated && warm_up_frame == 0) {
+            if (warmUPFrameRemaining) {
+                warmUPFrameRemaining--;
+                continue;
+            }
+
 #ifdef USE_DBSCAN
-            merge_successful = registrator.mergePCD(pcd, depthProcessor->handMesh);
+            bool succeeded = registrator.mergePCD(pcd, depthProcessor->handMesh);
 #else
-            merge_successful = registrator.mergePCD(pcd);
+            bool succeeded = registrator.mergePCD(pcd);
 #endif
+            frameCounter++;
+
+            // Continue to send existing data regardless succeeded or not, as long as there are existing reconstruction
+            Eigen::MatrixXd objectPCD;
+            if (registrator.getReconstructedPCDInEigenFormat(objectPCD)) {
+#if 1
+                std::cout << "[ReconstructedPCD] " << objectPCD.size() << "  succeeded = " << succeeded << std::endl;
+#endif
+                sendAndViewReconstructedPCD(objectPCD, POINT_COLOR[succeeded]);
+            }
+
+
+        }
+
+    }
+});
+
+bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
+    static bool viewHasSet = false;
+    if (viewerShouldReset) {
+        viewHasSet = false;
+        viewerShouldReset = false;
+    }
+
+    bool redraw = false;
+
+    // Static to keep last data if only one of them is updated
+    static HandDebugFrame hand;
+    static Eigen::MatrixXd pcd;
+    static Eigen::RowVector3d pcdColor;
+
+    {
+        std::lock_guard _(handDebugFrameLock);
+        if (handDebugFrameUpdated) {
+            hand = std::move(handDebugFrame);  // safe to move since it's only used to pass in here
+            handDebugFrameUpdated = false;
+            redraw = true;
         }
     }
 
-    // Display Registration
-    Eigen::RowVector3d pointColor = merge_successful ? Eigen::RowVector3d(1, 1, 1) : Eigen::RowVector3d(1, 0.5, 0);
-
-    if (pcdUpdated && registrator.getReconstructedPCDInEigenFormat(ReconstructedPCD)) {
-        std::cout << "[ReconstructedPCD] " << ReconstructedPCD.size() << "  merge_successful = "
-                  << merge_successful << std::endl;
-        viewer.data().add_points(ReconstructedPCD, pointColor);
-        tcpStreamingSource.sendReconstructedPCD(pointColor, *registrator.getReconstructedPCD(), rawDataFrame.rig2world);
-        redraw = true;
+    {
+        std::lock_guard _(reconstructedPCDLock);
+        if (reconstructedPCDUpdated) {
+            pcd = std::move(reconstructedPCD);  // safe to move since it's only used to pass in here
+            pcdColor = std::move(reconstructedPCDColor);
+            reconstructedPCDUpdated = false;
+        }
     }
 
     if (redraw) {
         viewer.data().clear();
 
-        // PCD
-        {
-
-
-            //Send merged point cloud
-            // TODO: global variable...
+        // Reconstructed PCD
+        if (pcd.rows() > 0) {
+            viewer.data().add_points(pcd, pcdColor);
 
             // Set camera on first frame
-            if (warm_up_frame > 0 && pcd.size() > 200) {
-                warm_up_frame--;
-                if (warm_up_frame == 0) {
-                    Eigen::MatrixXd points(pcd.size(), 3);
-                    for (int i = 0; i < pcd.size(); i++) {
-                        points.row(i) = pcd[i].cast<double>();
-                    }
-                    viewer.core().align_camera_center(points);
-                }
+            if (!viewHasSet) {
+                viewer.core().align_camera_center(pcd);
+                viewHasSet = true;
             }
         }
 
-        // Hand meshes
-        {
-            for (int h = 0; h < HandIndexCount; h++) {
-                const auto &meshPoints = depthProcessor->handMesh[h];
-                Eigen::MatrixXd points(meshPoints.size(), 3);
-                for (int i = 0; i < meshPoints.size(); i++) {
-                    points.row(i) = XMVectorToEigenVector3d(meshPoints[i]);
-                }
-                viewer.data().add_points(points, HAND_MESH_COLOR[h]);
-            }
+        // Hands
+        int lhvSize = static_cast<int>(hand.lhMesh.size());
+        int lhiSize = static_cast<int>(hand.lhIndices.size());
+        int rhvSize = static_cast<int>(hand.rhMesh.size());
+        int rhiSize = static_cast<int>(hand.rhIndices.size());
+        Eigen::MatrixXd jointPoints(lhvSize + rhvSize, 3);
+        Eigen::MatrixXi jointIndices(lhiSize + rhiSize, 2);
+        Eigen::MatrixXd colors(lhiSize + rhiSize, 3);
+
+        for (int j = 0; j < lhvSize; j++) {
+            jointPoints.row(j) = XMVectorToEigenVector3d(hand.lhMesh[j]);
+        }
+        for (int j = 0; j < rhvSize; j++) {
+            jointPoints.row(j + lhvSize) = XMVectorToEigenVector3d(hand.rhMesh[j]);
         }
 
-        // Hand edges
-#if 1
-        bool leftTracked = rawDataFrame.hands[Left].strictlyTracked;
-        bool rightTracked = rawDataFrame.hands[Right].strictlyTracked;
-
-        if (!lostTracking && hasDebugHand) {
-
-            // TODO: clean up the duplicate code
-            if (leftTracked && rightTracked) {
-                int lhvSize = static_cast<int>(debugHandFrame.lhMesh.size());
-                int lhiSize = static_cast<int>(debugHandFrame.lhIndices.size());
-                int rhvSize = static_cast<int>(debugHandFrame.rhMesh.size());
-                int rhiSize = static_cast<int>(debugHandFrame.rhIndices.size());
-                Eigen::MatrixXd jointPoints(lhvSize + rhvSize, 3);
-                Eigen::MatrixXi jointIndices(lhiSize + rhiSize, 2);
-                Eigen::MatrixXd colors(lhiSize + rhiSize, 3);
-
-                for (int j = 0; j < lhvSize; j++) {
-                    jointPoints.row(j) = XMVectorToEigenVector3d(debugHandFrame.lhMesh[j]);
-                }
-                for (int j = 0; j < rhvSize; j++) {
-                    jointPoints.row(j + lhvSize) = XMVectorToEigenVector3d(debugHandFrame.rhMesh[j]);
-                }
-
-                for (int j = 0; j < lhiSize; j++) {
-                    jointIndices.row(j) << debugHandFrame.lhIndices[j][0], debugHandFrame.lhIndices[j][1];
-                    colors.row(j) = Eigen::RowVector3d(0, 1, 0);
-                }
-                for (int j = 0; j < rhiSize; j++) {
-                    jointIndices.row(j + lhiSize) << debugHandFrame.rhIndices[j][0] + lhvSize,
-                            debugHandFrame.rhIndices[j][1] + lhvSize;
-                    colors.row(j + lhiSize) = Eigen::RowVector3d(1, 0, 0);
-                }
-
-                viewer.data().set_edges(jointPoints, jointIndices, colors);
-
-            } else if (leftTracked) {
-
-                int lhvSize = static_cast<int>(debugHandFrame.lhMesh.size());
-                int lhiSize = static_cast<int>(debugHandFrame.lhIndices.size());
-                Eigen::MatrixXd jointPoints(lhvSize, 3);
-                Eigen::MatrixXi jointIndices(lhiSize, 2);
-
-                for (int j = 0; j < lhvSize; j++) {
-                    jointPoints.row(j) = XMVectorToEigenVector3d(debugHandFrame.lhMesh[j]);
-                }
-
-                for (int j = 0; j < lhiSize; j++) {
-                    jointIndices.row(j) << debugHandFrame.lhIndices[j][0], debugHandFrame.lhIndices[j][1];
-                }
-
-                viewer.data().set_edges(jointPoints, jointIndices, Eigen::RowVector3d(0, 1, 0));
-
-            } else if (rightTracked) {
-
-                int rhvSize = static_cast<int>(debugHandFrame.rhMesh.size());
-                int rhiSize = static_cast<int>(debugHandFrame.rhIndices.size());
-                Eigen::MatrixXd jointPoints(rhvSize, 3);
-                Eigen::MatrixXi jointIndices(rhiSize, 2);
-
-                for (int j = 0; j < rhvSize; j++) {
-                    jointPoints.row(j) = XMVectorToEigenVector3d(debugHandFrame.rhMesh[j]);
-                }
-
-                for (int j = 0; j < rhiSize; j++) {
-                    jointIndices.row(j) << debugHandFrame.rhIndices[j][0], debugHandFrame.rhIndices[j][1];
-                }
-
-                viewer.data().set_edges(jointPoints, jointIndices, Eigen::RowVector3d(1, 0, 0));
-            }
+        for (int j = 0; j < lhiSize; j++) {
+            jointIndices.row(j) << hand.lhIndices[j][0], hand.lhIndices[j][1];
+            colors.row(j) = Eigen::RowVector3d(0, 1, 0);
         }
-#endif
+        for (int j = 0; j < rhiSize; j++) {
+            jointIndices.row(j + lhiSize) << hand.rhIndices[j][0] + lhvSize, hand.rhIndices[j][1] + lhvSize;
+            colors.row(j + lhiSize) = Eigen::RowVector3d(1, 0, 0);
+        }
+
+        viewer.data().set_edges(jointPoints, jointIndices, colors);
     }
 
     return false;
@@ -276,24 +294,6 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 
 int main() {
     std::ios::sync_with_stdio(false);
-
-#ifdef BOOST_AVAILABLE
-    discardDelayedFrames = true;
-    rawDataSource = static_cast<RawDataSource *>(&tcpStreamingSource);
-#else
-#error "Boost not available"
-#endif
-
-//    discardDelayedFrames = false;
-//    std::unique_ptr<FileDataSource> fileDataSource = std::make_unique<FileDataSource>("/Users/liuzikai/Files/MR-Local/2022-11-01-201827-AHAT-PV-EYE-Green-Book-Slow");
-//    ahatSource = static_cast<AHATSource *>(fileDataSource.get());
-//    interactionSource = static_cast<InteractionSource *>(fileDataSource.get());
-
-    for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 24; j++) {
-            BOTH_HANDS_EDGE_COLORS.row(i * 24 + j) = HAND_COLOR[i];
-        }
-    }
 
     igl::opengl::glfw::Viewer viewer;
     viewer.callback_pre_draw = callBackPerDraw;
@@ -303,5 +303,9 @@ int main() {
     viewer.core().is_animating = true;
     Eigen::Vector4f color(1, 1, 1, 1);
     viewer.core().background_color = color * 0.0f;
-    viewer.launch();
+    viewer.launch();  // blocking
+
+    shouldExit = true;
+    depthToPCDThread.join();
+    registrationThread.join();
 }
