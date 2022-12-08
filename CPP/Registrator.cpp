@@ -5,6 +5,8 @@
 #include "open3d/Open3D.h"
 #include "Registrator.h"
 #include <memory>
+#include <string>
+#include <fstream>
 
 using namespace open3d;
 using std::cout;
@@ -177,8 +179,44 @@ void Registrator::update_pcd(const std::shared_ptr<open3d::geometry::PointCloud>
     pcd->points_ = new_points;
 }
 
+void Registrator::denoise(const std::shared_ptr<open3d::geometry::PointCloud>& pcd) const {
+    try {
+        std::string noisy_file_name = "noisy_pcd.xyz";
+        std::string denoised_file_name = "denoised_pcd.xyz";
+        cout << "\nWriting  noisy pcd to file: " + noisy_file_name << endl;
+        std::ofstream ostream("../noisy/" + noisy_file_name, std::ofstream::out);
+        if (ostream.is_open()) {
+            for (int i = 0; i < pcd->points_.size(); i++) {
+                ostream << pcd->points_[i](0) << " " << pcd->points_[i](1) << " " << pcd->points_[i](2) << "\n";
+            }
+            ostream.close();
+        } else {
+            cout << "Could not create file: " + noisy_file_name << endl;
+        }
+        cout << "Finished writing noisy pcd to file! Handing over to Python" << endl;
+        std::string command = std::string("cd ../ext/score-denoise && python test_single.py --input_xyz ../../noisy/") 
+            + noisy_file_name + " --output_xyz ../../denoised/" + denoised_file_name;
+        system(command.c_str());
+        cout << "Finished denoising!" << endl;
+
+        //Read back the denoised point cloud
+        cout << "C++ takes over. Reading the denoised point cloud..." << endl;
+        pcd->points_.clear();
+        std::ifstream istream("../denoised/" + denoised_file_name, std::ifstream::in);
+        for(std::string line; std::getline(istream, line); ) { //read stream line by line
+            std::istringstream in(line); //make a stream for the line itself
+            float x, y, z;
+            in >> x >> y >> z;
+            pcd->points_.push_back(Eigen::Vector3d(x, y, z));
+        }
+    } catch (const char* msg) {
+        std::cerr << msg << endl;
+    }
+}
+
 void Registrator::saveReconstructedMesh(const std::string &save_path) {
     if (!m_pcd) return;
+
     std::shared_ptr<open3d::geometry::TriangleMesh> mesh;
     std::vector<double> densities;
     m_pcd->EstimateNormals();
@@ -211,6 +249,9 @@ void Registrator::saveReconstructedMesh(const std::string &save_path) {
 
     updatePCDMatrixFromPCD();
 #endif
+
+    denoise(m_pcd);
+
     float scale = 3;
     m_pcd->EstimateNormals();
     std::tie(mesh, densities) = geometry::TriangleMesh::CreateFromPointCloudPoisson(*m_pcd, 8UL, 0, scale);
