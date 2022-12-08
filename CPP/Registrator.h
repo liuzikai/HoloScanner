@@ -14,6 +14,7 @@
 
 
 //#define USE_DBSCAN
+#define FINAL_DBSCAN
 
 class Registrator {
 public:
@@ -57,12 +58,16 @@ public:
      */
     void saveReconstructedMesh(const std::string &save_path) const;
 
+    void reset();
+
 private:
     std::shared_ptr<open3d::geometry::PointCloud> m_pcd;
     float m_max_corr_dist_transformation = 0.005;
     float m_max_corr_dist_evaluation = 0.007;
     float m_max_rmse = 0.004;
     float m_min_fitness = 0.97;
+
+    void update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const;
 
     /**
      * @brief Construct a new is Registration Successful object

@@ -187,7 +187,7 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
 
                     joint.translationInRig = DirectX::XMVector3Transform(XMTransformToTranslate(joint.transformationInWorld),
                                                                 world2rig);
-//                    joint.translationInRig /= DirectX::XMVectorGetW(joint.translationInRig);
+                    joint.translationInRig /= DirectX::XMVectorGetW(joint.translationInRig);
                 }
 
                 // Hand tracked + all joints tracked
