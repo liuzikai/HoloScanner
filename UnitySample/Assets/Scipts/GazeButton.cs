@@ -4,6 +4,7 @@ using UnityEngine;
 using Microsoft.MixedReality.Toolkit.Input;
 using UnityEngine.UI;
 using Microsoft.MixedReality.Toolkit;
+using UnityEditor.PackageManager;
 
 public class GazeButton : MonoBehaviour {
 
@@ -12,11 +13,15 @@ public class GazeButton : MonoBehaviour {
     public Image image;
     public Color startColor;
     public Color stopColor;
+    public ParticleSystem ps;
 
     private const float FILL_DURATION = 2;
     private const float TRANSITION_DURATION = 1.2f;
+    private const float PRE_GAZE_DURATION = 0.4f;
 
+    private bool isReallyGazing = false;
     private bool isGazing = false;
+    private float preGazeTimer = 0;
     private float timer = 0;
     private StopStartController controller;
     private float currentRotationY = 0;
@@ -31,6 +36,7 @@ public class GazeButton : MonoBehaviour {
     void Start() {
         controller = GetComponentInParent<StopStartController>();
         image.color = startColor;
+        ps.Pause();
     }
 
     private void TransitionState() {
@@ -50,6 +56,8 @@ public class GazeButton : MonoBehaviour {
 
     void Update() {
         // Debug.Log($"State: {state}");
+        Ray ray = new Ray(CoreServices.InputSystem.GazeProvider.GazeOrigin, CoreServices.InputSystem.GazeProvider.GazeDirection);
+        isGazing = Physics.Raycast(ray, out RaycastHit hitInfo, 10, gazableMask);
         if (state == State.Transitioning) {
             timer += Time.deltaTime;
             transform.localRotation = Quaternion.Euler(0, currentRotationY + 180 * timer / TRANSITION_DURATION, 0);
@@ -58,13 +66,23 @@ public class GazeButton : MonoBehaviour {
                 state = controller.IsScanning ? State.Scanning : State.NotScanning;
             }
         } else {
-            Ray ray = new Ray(CoreServices.InputSystem.GazeProvider.GazeOrigin, CoreServices.InputSystem.GazeProvider.GazeDirection);
-            isGazing = Physics.Raycast(ray, 10, gazableMask);
             if (isGazing) {
-                //Debug.Log("Gazing!");
-                timer += Time.deltaTime;
+                if (isReallyGazing) {
+                    //Debug.Log("Gazing!");
+                    timer += Time.deltaTime;
+                } else {
+                    preGazeTimer += Time.deltaTime;
+                    if(preGazeTimer >= PRE_GAZE_DURATION) {
+                        isReallyGazing = true;
+                        preGazeTimer = 0;
+                    }
+                }
             } else {
                 timer -= Time.deltaTime;
+                if (timer <= 0) {
+                    isReallyGazing = false;
+                }
+                preGazeTimer = 0;
             }
             // Debug.Log(ray);
             timer = Mathf.Clamp(timer, 0, FILL_DURATION);
@@ -72,6 +90,15 @@ public class GazeButton : MonoBehaviour {
             if (timer >= FILL_DURATION) {
                 TransitionState();
             }
+        }
+        if(isGazing) {
+            ps.transform.position = hitInfo.point;
+            if(Random.value < 0.15)
+                ps.Emit(1);
+            //if (ps.isPaused)
+            //    ps.Play();
+        } else {
+            //ps.Pause();
         }
     }
 }
