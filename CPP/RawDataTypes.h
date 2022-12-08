@@ -21,7 +21,7 @@ using AHATDepth = std::vector<uint16_t>;  // row-major order (AHAT_WIDTH * AHAT_
 struct HandJoint {
     bool tracked;
     DirectX::XMMATRIX transformationInWorld;  // world coordinate
-    DirectX::XMVECTOR translationInRig;       // rig coordinate
+    DirectX::XMVECTOR translationInWorld;     // world coordinate
 };
 
 enum HandJointIndex {
