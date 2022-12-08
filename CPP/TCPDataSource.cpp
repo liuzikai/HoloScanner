@@ -41,9 +41,9 @@ bool TCPDataSource::sendReconstructedPCD(const Eigen::RowVector3d &pointColor, c
     data.emplace_back((float) pointColor(2));
     for (int i = 0; i < pcd.rows(); i++) {
         // EigenVector3dToXMVector, but -z
-        data.emplace_back((float) -pcd(i, 1));
-        data.emplace_back((float) -pcd(i, 0));
-        data.emplace_back((float) pcd(i, 2));
+        data.emplace_back((float) pcd(i, 0));
+        data.emplace_back((float) pcd(i, 1));
+        data.emplace_back((float) -pcd(i, 2));
     }
     socketServer.sendBytes("P", reinterpret_cast<uint8_t *>(data.data()), data.size() * sizeof(float));
     return true;
