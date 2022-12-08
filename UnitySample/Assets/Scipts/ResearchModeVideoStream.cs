@@ -66,6 +66,9 @@ public class ResearchModeVideoStream : MonoBehaviour
     Windows.Perception.Spatial.SpatialCoordinateSystem unityWorldOrigin;
 #endif
 
+    public int rawDataDownSampleFactor = 5;
+    private int rawDataDownSampleCounter = 0;
+
     private bool AHATLUTSent = false;
 
     public Renderer RawDataStreamingLED;
@@ -255,13 +258,19 @@ public class ResearchModeVideoStream : MonoBehaviour
 
                 if (AHATLUTSent)
                 {
-                    var timestamp = researchMode.GetDepthUpdateTimestamp();
+                    rawDataDownSampleCounter++;
+                    if (rawDataDownSampleCounter >= rawDataDownSampleFactor)
+                    {
+                        var timestamp = researchMode.GetDepthUpdateTimestamp();
 
-                    // Measurements shows that the this call only takes 1-2ms
-                    interactions.Update(timestamp);
+                        // Measurements shows that the this call only takes 1-2ms
+                        interactions.Update(timestamp);
 
-                    // TODO: timestamp and actual data may out-of-sync, but ignore for now
-                    SendRawData(timestamp.TargetTime.ToUnixTimeMilliseconds());
+                        // TODO: timestamp and actual data acquired inside may out-of-sync, but ignore for now
+                        SendRawData(timestamp.TargetTime.ToUnixTimeMilliseconds());
+
+                        rawDataDownSampleCounter = 0;
+                    }
                 }
             }
         }
@@ -446,7 +455,7 @@ public class ResearchModeVideoStream : MonoBehaviour
         startRealtimePreview = false;
     }
 
-    public void ToggleRawDataStreamingEvent__() {
+    public void ToggleRawDataStreamingEvent() {
         if (!RawDataStreaming) {
             if (tcpClient.Connected) {
                 RawDataStreaming = true;
@@ -470,29 +479,6 @@ public class ResearchModeVideoStream : MonoBehaviour
                 tcpClient.SendFloatAsync("s", data.ToArray(), false);  // must not be dropped
 #endif
             }
-        }
-    }
-
-    public void ToggleRawDataStreamingEvent() {
-        if (!RawDataStreaming) 
-        {
-            if (tcpClient.Connected) 
-            {
-                RawDataStreaming = true;
-                AHATLUTSent = false;
-                RawDataStreamingLED.material.color = Color.yellow;
-
-#if ENABLE_WINMD_SUPPORT
-                var data = new List<float>();
-                SerializeMatrix4x4(data, researchMode.GetDepthExtrinsics());
-                tcpClient.SendFloatAsync("e", data.ToArray(), false);  // must not be dropped
-#endif
-            }
-            
-        } else 
-        {
-            RawDataStreaming = false;
-            RawDataStreamingLED.material.color = Color.red;
         }
     }
 

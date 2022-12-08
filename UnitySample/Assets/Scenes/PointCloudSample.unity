@@ -1184,6 +1184,7 @@ MonoBehaviour:
   - 169.254.41.190
   - 192.168.1.108
   - 192.168.1.107
+  - 192.168.155.61
   port: 9090
   ConnectionStatusLED: {fileID: 1648274831}
   ConnectButtonText: {fileID: 563252823}
@@ -1335,22 +1336,22 @@ PrefabInstance:
     - target: {fileID: 7967545275011894015, guid: 0567a88d0b0de0c46a23d80147831c98,
         type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.05
+      value: 0.075
       objectReference: {fileID: 0}
     - target: {fileID: 7967545275011894015, guid: 0567a88d0b0de0c46a23d80147831c98,
         type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.05
+      value: 0.075
       objectReference: {fileID: 0}
     - target: {fileID: 7967545275011894015, guid: 0567a88d0b0de0c46a23d80147831c98,
         type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.05
+      value: 0.075
       objectReference: {fileID: 0}
     - target: {fileID: 7967545275011894015, guid: 0567a88d0b0de0c46a23d80147831c98,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.005
+      value: -0.051
       objectReference: {fileID: 0}
     - target: {fileID: 7967545275011894015, guid: 0567a88d0b0de0c46a23d80147831c98,
         type: 3}
@@ -1402,7 +1403,8 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 584799075191778243, guid: 0567a88d0b0de0c46a23d80147831c98, type: 3}
   m_SourcePrefab: {fileID: 100100000, guid: 0567a88d0b0de0c46a23d80147831c98, type: 3}
 --- !u!4 &1153926574 stripped
 Transform:

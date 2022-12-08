@@ -9,13 +9,13 @@ public class StopStartController : MonoBehaviour
     public ResearchModeVideoStream stream;
 
     public void StartScanning() {
-        stream.ToggleRawDataStreamingEvent__();
+        stream.ToggleRawDataStreamingEvent();
         IsScanning = true;
         Debug.Log("Sent Start signal to 'ToggleRawDataStreamingEvent'!");
     }
 
     public void StopScanning() {
-        stream.ToggleRawDataStreamingEvent__();
+        stream.ToggleRawDataStreamingEvent();
         IsScanning = false;
         Debug.Log("Sent Stop signal to 'ToggleRawDataStreamingEvent'!");
         //TODO call internal 'Stop Scanning' Binding
