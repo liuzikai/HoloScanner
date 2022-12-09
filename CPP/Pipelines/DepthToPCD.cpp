@@ -35,7 +35,7 @@ public:
             pcd.reserve(pcdRaw.size() / 3);
             for (size_t i = 0; i < pcdRaw.size() / 3; i++) {
                 // NOTICE: swapping x and y and all negated
-                pcd.emplace_back(-pcdRaw[i * 3 + 1], -pcdRaw[i * 3], -pcdRaw[i * 3 + 2]);
+                pcd.emplace_back(pcdRaw[i * 3], pcdRaw[i * 3 + 1], pcdRaw[i * 3 + 2]);
             }
             return true;
         } else {
@@ -73,9 +73,6 @@ bool handDebugFrameValid = false;
 HandDebugFrame handDebugFrame;
 bool handDebugFrameUpdated = false;
 
-std::mutex rig2WorldLock;
-DirectX::XMMATRIX rig2world;
-
 std::mutex reconstructedPCDLock;
 Eigen::MatrixXd reconstructedPCD;
 Eigen::RowVector3d reconstructedPCDColor;
@@ -103,12 +100,6 @@ std::thread depthToPCDThread([] {
             std::cout << "[Raw] " << rawDataFrame.timestamp << "    lostTracking = " << lostTracking << std::endl;
 #endif
             depthProcessor->update(rawDataFrame);
-
-            // Save rig2world
-            {
-                std::lock_guard _(rig2WorldLock);
-                rig2world = rawDataFrame.rig2world;
-            }
         }
     }
 });
@@ -120,13 +111,7 @@ std::thread depthToPCDThread([] {
  */
 void sendAndViewReconstructedPCD(Eigen::MatrixXd &objectPCD, const Eigen::RowVector3d &color) {
     // Send the PCD
-    // TODO: now rig2world is performed locally, but will be remotely
-    DirectX::XMMATRIX localRig2world;
-    {
-        std::lock_guard _(rig2WorldLock);
-        localRig2world = rig2world;
-    }
-    tcpDataSource.sendReconstructedPCD(color, objectPCD, localRig2world);
+    tcpDataSource.sendReconstructedPCD(color, objectPCD);
 
     // Give the PCD to the viewer (safe to std::move since we don't need it anymore)
     {
@@ -244,6 +229,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
             pcd = std::move(reconstructedPCD);  // safe to move since it's only used to pass in here
             pcdColor = std::move(reconstructedPCDColor);
             reconstructedPCDUpdated = false;
+            redraw = true;
         }
     }
 

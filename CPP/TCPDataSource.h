@@ -26,8 +26,7 @@ public:
 
     bool getNextPCD(timestamp_t &timestamp, PCD &pcd) override;
 
-    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const Eigen::MatrixXd &pcd,
-                              const DirectX::XMMATRIX &rig2world);
+    bool sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const Eigen::MatrixXd &pcd);
 
 private:
 

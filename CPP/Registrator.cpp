@@ -73,7 +73,7 @@ bool Registrator::mergePCD(const PCD &pcd_, std::vector<DirectX::XMVECTOR> handM
 bool Registrator::mergePCD(const PCD &pcd_)
 #endif
 {
-    if (pcd_.size() < 1000) return false;
+    if (pcd_.size() < 1500) return false;
     auto pcd = geometry::PointCloud(pcd_);
     if (m_pcd == nullptr) {  // first registration is always successful as it initializes the point cloud
         m_pcd = std::make_shared<geometry::PointCloud>(pcd);

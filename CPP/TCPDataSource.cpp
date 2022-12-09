@@ -33,21 +33,17 @@ TCPDataSource::~TCPDataSource() {
     if (tcpIOThread) tcpIOThread->join();
 }
 
-bool TCPDataSource::sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const Eigen::MatrixXd &pcd,
-                                         const DirectX::XMMATRIX &rig2world) {
+bool TCPDataSource::sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const Eigen::MatrixXd &pcd) {
     std::vector<float> data;
     data.reserve(3 + pcd.size() * 3);
     data.emplace_back((float) pointColor(0));
     data.emplace_back((float) pointColor(1));
     data.emplace_back((float) pointColor(2));
     for (int i = 0; i < pcd.rows(); i++) {
-        DirectX::XMVECTOR v = EigenVector3dToXMVector(pcd.row(i));
-        v = DirectX::XMVector3Transform(v, rig2world);
-        DirectX::XMFLOAT4 f;
-        DirectX::XMStoreFloat4(&f, v);
-        data.emplace_back((float) f.x / f.w);
-        data.emplace_back((float) f.y / f.w);
-        data.emplace_back((float) -f.z / f.w);
+        // EigenVector3dToXMVector, but -z
+        data.emplace_back((float) pcd(i, 0));
+        data.emplace_back((float) pcd(i, 1));
+        data.emplace_back((float) -pcd(i, 2));
     }
     socketServer.sendBytes("P", reinterpret_cast<uint8_t *>(data.data()), data.size() * sizeof(float));
     return true;
@@ -70,7 +66,7 @@ bool TCPDataSource::getAHATDepthLUT(AHATLUT &lut) {
 bool TCPDataSource::getNextRawDataFrame(RawDataFrame &frame) {
     std::lock_guard<std::mutex> lock(rawDataFrameMutex);
     if (rawDataFrames.empty()) return false;
-    frame = std::move(rawDataFrames.front());  // TODO: not sure if rvalue-reference works for vectors inside struct
+    frame = std::move(rawDataFrames.front());
     rawDataFrames.pop();
     return true;
 }
@@ -186,9 +182,8 @@ void TCPDataSource::handleRecvBytes(std::string_view name, const uint8_t *buf, s
                     joint.transformationInWorld = DirectX::XMLoadFloat4x4((const DirectX::XMFLOAT4X4 *) fbuf);
                     fbuf += 16;
 
-                    joint.translationInRig = DirectX::XMVector3Transform(XMTransformToTranslate(joint.transformationInWorld),
-                                                                world2rig);
-                    joint.translationInRig /= DirectX::XMVectorGetW(joint.translationInRig);
+                    joint.translationInWorld = XMTransformToTranslate(joint.transformationInWorld);
+                    joint.translationInWorld /= DirectX::XMVectorGetW(joint.translationInWorld);
                 }
 
                 // Hand tracked + all joints tracked
