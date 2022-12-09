@@ -451,6 +451,9 @@ bool DepthProcessor::update(const RawDataFrame &input) {
     auto rwTransf = input.hands[HandIndex::Right].joints[HandJointIndex::Wrist].translationInWorld;
     auto midpoint = (lwTranf + rwTransf) * 0.5f;
 
+    DirectX::XMMATRIX cam2world = cam2rig * input.rig2world;
+    midpoint = XMVector3Transform(midpoint, XMMatrixInverse(nullptr, cam2world));
+
     auto midpZ = static_cast<uint16_t>(XMVectorGetZ(midpoint) * 1000.0f);
     auto depthNearClip = midpZ - DEPTH_FILTER_OFFSET;
     auto depthFarClip = midpZ + DEPTH_FILTER_OFFSET;
@@ -472,8 +475,6 @@ bool DepthProcessor::update(const RawDataFrame &input) {
         }
     }
     stdLogIndex = nextInd;
-
-    DirectX::XMMATRIX cam2world = cam2rig * input.rig2world;
 
     for (auto r = 0; r < CLIPPED_DEPTH_FRAME_HEIGHT; ++r) {
         for (auto c = 0; c < CLIPPED_DEPTH_FRAME_WIDTH; ++c) {
