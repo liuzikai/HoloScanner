@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class KeyboardCommand : MonoBehaviour
 {
@@ -29,6 +30,10 @@ public class KeyboardCommand : MonoBehaviour
     }
 
     public void ToggleDebugText() {
-        if (debugText != null) debugText.SetActive(!debugText.activeInHierarchy);
+        if (debugText != null) 
+        {
+            debugText.GetComponent<TMP_Text>().text = "Debug\n";
+            debugText.SetActive(!debugText.activeInHierarchy);
+        }
     }
 }

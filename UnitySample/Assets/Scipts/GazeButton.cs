@@ -4,6 +4,7 @@ using UnityEngine;
 using Microsoft.MixedReality.Toolkit.Input;
 using UnityEngine.UI;
 using Microsoft.MixedReality.Toolkit;
+using UnityEngine.Events;
 
 public class GazeButton : MonoBehaviour {
 
@@ -24,7 +25,6 @@ public class GazeButton : MonoBehaviour {
     private bool isGazing = false;
     private float preGazeTimer = 0;
     private float timer = 0;
-    private StopStartController controller;
     private float currentRotationY = 0;
 
     public enum State {
@@ -34,22 +34,27 @@ public class GazeButton : MonoBehaviour {
     }
     public State state { get; private set; } = State.NotScanning;
 
+    private bool isScanning = false;
+
+    public UnityEvent scanningToogleEvent;
+
     void Start() {
-        controller = GetComponentInParent<StopStartController>();
         image.color = startColor;
         ps.Pause();
     }
 
     public void TransitionState(bool noAction = false) {
         image.fillAmount = 0;
-        if(state == State.Scanning) {
+        if (state == State.Scanning) {
             currentRotationY = 180;
             image.color = startColor;
-            if (!noAction) controller.StopScanning();
+            isScanning = false;
+            if (!noAction) scanningToogleEvent.Invoke();
         } else {
             currentRotationY = 0;
             image.color = stopColor;
-            if (!noAction) controller.StartScanning();
+            isScanning = true;
+            if (!noAction) scanningToogleEvent.Invoke();
         }
         timer = 0;
         state = State.Transitioning;
@@ -63,9 +68,9 @@ public class GazeButton : MonoBehaviour {
         if (state == State.Transitioning) {
             timer += Time.deltaTime;
             transform.localRotation = Quaternion.Euler(0, currentRotationY + 180 * timer / TRANSITION_DURATION, 0);
-            if(timer >= TRANSITION_DURATION) {
+            if (timer >= TRANSITION_DURATION) {
                 timer = 0;
-                state = controller.IsScanning ? State.Scanning : State.NotScanning;
+                state = isScanning ? State.Scanning : State.NotScanning;  // transition done
             }
         } else {
             if (isGazing) {

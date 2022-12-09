@@ -5,7 +5,7 @@ using UnityEngine;
 
 public class StopStartController : MonoBehaviour
 {
-    public bool IsScanning { get; private set; }
+    public bool IsScanning = false;
     public ResearchModeVideoStream stream;
 
     public void StartScanning() {

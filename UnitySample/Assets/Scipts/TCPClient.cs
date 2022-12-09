@@ -72,7 +72,7 @@ public class TCPClient : MonoBehaviour
     public DataWriter dw;
     public DataReader dr;
 
-    private Task readingTask = null;
+    private Task<(Color, float[], string)> readingTask = null;
 
     private async void StartConnection()
     {
@@ -140,34 +140,41 @@ public class TCPClient : MonoBehaviour
 
     private void StopConnection()
     {
-        if (videoStream.RawDataStreaming) videoStream.ToggleRawDataStreamingEvent();
-        if (videoStream.PointCloudStreaming) videoStream.TogglePointCloudStreamingEvent();
-
-        Connected = false;
-
-        gazeButton.Enabled = false;
-
-        ConnectionStatusLED.material.color = Color.red;
-        ConnectButtonText.text = "Connect to Server";
-
-        PendingMessageCount = 0;
-
-        if (gazeButton.state == GazeButton.State.Scanning)
+        try
         {
-            gazeButton.TransitionState(true);  // change state but no triggering action
+            if (videoStream.RawDataStreaming) videoStream.ToggleRawDataStreamingEvent();
+            if (videoStream.PointCloudStreaming) videoStream.TogglePointCloudStreamingEvent();
+
+            Connected = false;
+
+            gazeButton.Enabled = false;
+
+            ConnectionStatusLED.material.color = Color.red;
+            ConnectButtonText.text = "Connect to Server";
+
+            PendingMessageCount = 0;
+
+            if (gazeButton.state == GazeButton.State.Scanning)
+            {
+                gazeButton.TransitionState(true);  // change state but no triggering action
+            }
+
+            dw?.DetachStream();
+            dw?.Dispose();
+            dw = null;
+
+            dr?.DetachStream();
+            dr?.Dispose();
+            dr = null;
+
+            readingTask = null;  // discard the task
+
+            socket?.Dispose();
         }
-
-        dw?.DetachStream();
-        dw?.Dispose();
-        dw = null;
-
-        dr?.DetachStream();
-        dr?.Dispose();
-        dr = null;
-
-        readingTask = null;  // discard the task
-
-        socket?.Dispose();
+        catch (Exception ex)
+        {
+            videoStream.text.text += "[TCPClient] " + ex.Message + "\n";
+        }
     }
 
     public async void SendUINT16Async(string header, ushort[] data, bool canDrop = true)
@@ -329,22 +336,53 @@ public class TCPClient : MonoBehaviour
         PendingMessageCount--;
     }
 
-    private async Task ReadPointCloudFromPC(DataReader dr) 
+    private async Task<(Color, float[], string)> ReadPointCloudFromPC(DataReader dr) 
     {
         try 
         {
-            while (dr.UnconsumedBufferLength > 0)
+            if (dr.UnconsumedBufferLength > 0)  // if state not clean, clear all buffer
             {
-                await dr.LoadAsync(1);
-                if (dr.ReadByte() == Preamble) break;
+                dr.ReadBuffer(dr.UnconsumedBufferLength);
+                return (new Color(), null, "Recovering...");
             }
 
-            await dr.LoadAsync(1);
-            if (dr.ReadByte() != (byte) PackageType.Bytes) return;
+            // Keep finding Preamble
+            while (true)
+            {
+                await dr.LoadAsync(1);
+                if (dr.ReadByte() != Preamble)
+                {
+                    // videoStream.text.text += "Not Preamble" + "\n";
+                    continue;
+                }
 
-            await dr.LoadAsync(2);  // NOTICE: here we hard code the name to be length-1 string
-            if (dr.ReadByte() != (byte) 'P') return;
-            dr.ReadByte();
+                await dr.LoadAsync(1);
+                byte t = dr.ReadByte();
+                if (t != (byte) PackageType.Bytes) 
+                {
+                    // videoStream.text.text += "Unexpected type: " + t.ToString() + "\n";
+                    continue;
+                    // return (new Color(), null, "Unexpected type: " + t.ToString());
+                }
+
+                await dr.LoadAsync(2);  // NOTICE: here we hard code the name to be length-1 string
+                byte identifier = dr.ReadByte();
+                if (identifier != (byte) 'P') 
+                {
+                    // videoStream.text.text += "Unknown identifier: " + identifier.ToString() + "\n";
+                    continue;
+                    // return (new Color(), null, "Unknown identifier: " + identifier.ToString());
+                }
+                identifier = dr.ReadByte();
+                if (identifier != (byte) '\0') 
+                {
+                    // videoStream.text.text += "Unknown ending: " + identifier.ToString() + "\n";
+                    continue;
+                    // return (new Color(), null, "Unknown ending: " + identifier.ToString());
+                }
+
+                break;
+            }
 
             await dr.LoadAsync(4);
             uint bytesToRead = dr.ReadUInt32();
@@ -352,25 +390,25 @@ public class TCPClient : MonoBehaviour
 
             // Sanity check
             if (bytesToRead < 3 * sizeof(float) || bytesToRead % sizeof(float) != 0) {
-                videoStream.text.text = "Invalid float array size (bytes): " + bytesToRead.ToString();
-                Debug.Log(videoStream.text.text);
-                return;
+                return (new Color(), null, "Invalid float array size (bytes): " + bytesToRead.ToString());
+            }
+
+            if (bytesToRead > 1000000 * sizeof(float)) {  // normally like 35000
+                return (new Color(), null, "Unreasonably large point cloud: " + bytesToRead.ToString());
             }
 
             // Point color
             Color pointColor = new Color(dr.ReadSingle(), dr.ReadSingle(), dr.ReadSingle());
-            videoStream.pointColor = pointColor;
             bytesToRead -= 3 * sizeof(float);
 
             // Points
             var bytes = new byte[bytesToRead];
             dr.ReadBytes(bytes);
-            videoStream.RenderPointCloud(videoStream.FloatToVector3(BytesToFloat(bytes))); 
+            return (pointColor, BytesToFloat(bytes), null);
         }
         catch (Exception ex)
         {
-            videoStream.text.text = ex.Message;
-            Debug.Log(videoStream.text.text);
+            return (new Color(), null, ex.Message);
         }
     }
 #endif
@@ -380,7 +418,22 @@ public class TCPClient : MonoBehaviour
 #if WINDOWS_UWP
         if (Connected && dr != null) 
         {
-            if (readingTask == null || readingTask.IsCompleted) 
+            if (readingTask != null && readingTask.IsCompleted)
+            {
+                (Color color, float[] pointCloud, string err) = readingTask.Result;
+                if (err != null)
+                {
+                    videoStream.text.text += "[TCPClient] " + err + "\n";
+                } 
+                else
+                {
+                    videoStream.pointColor = color;
+                    videoStream.RenderPointCloudFromPC(pointCloud);
+                }
+                readingTask = null;
+            }
+
+            if (readingTask == null) 
             {
                 readingTask = ReadPointCloudFromPC(dr);  // restart async receiving
             }

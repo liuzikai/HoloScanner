@@ -364,45 +364,40 @@ public class ResearchModeVideoStream : MonoBehaviour
     {
         if (enablePointCloud && pointCloudRendererGo != null)
         {
-            if ((depthSensorMode == DepthSensorMode.LongThrow && !researchMode.LongThrowPointCloudUpdated()) ||
-                (depthSensorMode == DepthSensorMode.ShortThrow && !researchMode.PointCloudUpdated())) return;
-
-            float[] pointCloud = new float[] { };
-            if (depthSensorMode == DepthSensorMode.LongThrow) pointCloud = researchMode.GetLongThrowPointCloudBuffer();
-            else if (depthSensorMode == DepthSensorMode.ShortThrow) pointCloud = researchMode.GetPointCloudBuffer();
-            
-            if (pointCloud.Length > 0)
+            if (renderLocalPointCloud)
             {
-                Vector3[] pointCloudVector3 = FloatToVector3(pointCloud);
-                /* if (depthSensorMode == DepthSensorMode.ShortThrow) 
-                {
-                    text.text = "AHAT ";
-                } 
-                else if (depthSensorMode == DepthSensorMode.LongThrow) 
-                {
-                    text.text = "Long-Throw ";
-                }
-                text.text += "Point Cloud: " + pointCloudVector3.Length.ToString();
-                if (tcpClient != null)
-                {
-                    text.text += "\n"+ "TCP Pending: " + tcpClient.PendingMessageCount.ToString();
-                } */
+                if ((depthSensorMode == DepthSensorMode.LongThrow && !researchMode.LongThrowPointCloudUpdated()) ||
+                    (depthSensorMode == DepthSensorMode.ShortThrow && !researchMode.PointCloudUpdated())) return;
 
-                if (renderPointCloud)
+                float[] pointCloud = new float[] { };
+                if (depthSensorMode == DepthSensorMode.LongThrow) pointCloud = researchMode.GetLongThrowPointCloudBuffer();
+                else if (depthSensorMode == DepthSensorMode.ShortThrow) pointCloud = researchMode.GetPointCloudBuffer();
+                
+                if (pointCloud.Length > 0)
                 {
+                    Vector3[] pointCloudVector3 = FloatToVector3(pointCloud);
+
                     RenderPointCloud(pointCloudVector3);
-                }
 
-                // Send point cloud
-                if (PointCloudStreaming) 
-                {
-                    tcpClient.SendFloatAsync("p", pointCloud);
+                    // Send point cloud
+                    // FIXME: only if renderLocalPointCloud will reach here, but we are not using it now
+                    if (PointCloudStreaming) 
+                    {
+                        tcpClient.SendFloatAsync("p", pointCloud);
+                    }
                 }
-            }
+            } 
         }
     }
 
-    public Vector3[] FloatToVector3(float[] pointCloud)
+    public void RenderPointCloudFromPC(float[] pointCloud)  // should be called from UI thread
+    {
+        if (pointCloud == null) return;
+        if (renderLocalPointCloud) renderLocalPointCloud = false;  // turn off local point cloud once receive from PC
+        RenderPointCloud(FloatToVector3(pointCloud));
+    }
+
+    private Vector3[] FloatToVector3(float[] pointCloud)
     {
         if (pointCloud.Length % 3 != 0) return new Vector3[] {};
         int pointCloudLength = pointCloud.Length / 3;
@@ -414,7 +409,7 @@ public class ResearchModeVideoStream : MonoBehaviour
         return pointCloudVector3;
     }
 
-    public void RenderPointCloud(Vector3[] pointCloudVector3) 
+    private void RenderPointCloud(Vector3[] pointCloudVector3) 
     {
         pointCloudRenderer.Render(pointCloudVector3, pointColor);
     }
@@ -427,19 +422,20 @@ public class ResearchModeVideoStream : MonoBehaviour
         startRealtimePreview = !startRealtimePreview;
     }
 
-    bool renderPointCloud = true;
+    bool renderLocalPointCloud = true;
     public void TogglePointCloudEvent()
     {
-        renderPointCloud = !renderPointCloud;
-        if (renderPointCloud)
+        renderLocalPointCloud = !renderLocalPointCloud;
+        if (renderLocalPointCloud)
         {
             // pointCloudRendererGo.SetActive(true);
+            pointColor = Color.white;
         }
         else
         {
             // pointCloudRendererGo.SetActive(false);
 #if WINDOWS_UWP
-            RenderPointCloud(new Vector3[]{});
+            RenderPointCloud(new Vector3[]{});  // clear and wait for PC
 #endif
         }
     }
