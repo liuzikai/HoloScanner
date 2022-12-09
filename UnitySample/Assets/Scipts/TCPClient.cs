@@ -18,6 +18,7 @@ public class TCPClient : MonoBehaviour
     private void Awake()
     {
         ConnectionStatusLED.material.color = Color.red;
+        gazeButton.Enabled = false;
     }
     private void OnApplicationFocus(bool focus)
     {
@@ -41,9 +42,11 @@ public class TCPClient : MonoBehaviour
     public bool Connected { get; private set; } = false;
     public string ConnectedHostIP { get; private set; }
 
+    public GazeButton gazeButton;
+
     public ResearchModeVideoStream videoStream;
 
-    public int PendingMessageCount { get; private set; } = 0;
+    public int PendingMessageCount { get; private set; } = 0;  // no need to be accurate so no atomic
     public int MaxPendingMessageCount = 20;
 
 #if WINDOWS_UWP
@@ -123,6 +126,9 @@ public class TCPClient : MonoBehaviour
             Connected = true;
             ConnectionStatusLED.material.color = Color.green;
             ConnectButtonText.text = "Disconnect from " + ConnectedHostIP;
+
+            gazeButton.Enabled = true;
+
             return;
         }
 
@@ -135,10 +141,21 @@ public class TCPClient : MonoBehaviour
     private void StopConnection()
     {
         if (videoStream.RawDataStreaming) videoStream.ToggleRawDataStreamingEvent();
-        if (videoStream.InteractionStreaming) videoStream.ToggleInteractionStreamingEvent();
         if (videoStream.PointCloudStreaming) videoStream.TogglePointCloudStreamingEvent();
 
         Connected = false;
+
+        gazeButton.Enabled = false;
+
+        ConnectionStatusLED.material.color = Color.red;
+        ConnectButtonText.text = "Connect to Server";
+
+        PendingMessageCount = 0;
+
+        if (gazeButton.state == GazeButton.State.Scanning)
+        {
+            gazeButton.TransitionState(true);  // change state but no triggering action
+        }
 
         dw?.DetachStream();
         dw?.Dispose();
@@ -151,10 +168,6 @@ public class TCPClient : MonoBehaviour
         readingTask = null;  // discard the task
 
         socket?.Dispose();
-        ConnectionStatusLED.material.color = Color.red;
-        ConnectButtonText.text = "Connect to Server";
-
-        PendingMessageCount = 0;
     }
 
     public async void SendUINT16Async(string header, ushort[] data, bool canDrop = true)

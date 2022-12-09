@@ -4,7 +4,10 @@ using UnityEngine;
 
 public class KeyboardCommand : MonoBehaviour
 {
+    public GameObject debugText;
+
     ResearchModeVideoStream rm;
+
     void Start()
     {
         rm = GetComponent<ResearchModeVideoStream>();
@@ -23,5 +26,9 @@ public class KeyboardCommand : MonoBehaviour
 
     public void Exit() {
         Application.Quit();
+    }
+
+    public void ToggleDebugText() {
+        if (debugText != null) debugText.SetActive(!debugText.activeInHierarchy);
     }
 }
