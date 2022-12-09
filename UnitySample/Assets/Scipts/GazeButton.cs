@@ -4,9 +4,10 @@ using UnityEngine;
 using Microsoft.MixedReality.Toolkit.Input;
 using UnityEngine.UI;
 using Microsoft.MixedReality.Toolkit;
-using UnityEditor.PackageManager;
 
 public class GazeButton : MonoBehaviour {
+
+    public bool Enabled = true;
 
     public GazeProvider gazeProvider;
     public LayerMask gazableMask;
@@ -26,12 +27,12 @@ public class GazeButton : MonoBehaviour {
     private StopStartController controller;
     private float currentRotationY = 0;
 
-    enum State {
+    public enum State {
         Scanning,
         NotScanning,
         Transitioning,
     }
-    private State state = State.NotScanning;
+    public State state { get; private set; } = State.NotScanning;
 
     void Start() {
         controller = GetComponentInParent<StopStartController>();
@@ -39,16 +40,16 @@ public class GazeButton : MonoBehaviour {
         ps.Pause();
     }
 
-    private void TransitionState() {
+    public void TransitionState(bool noAction = false) {
         image.fillAmount = 0;
         if(state == State.Scanning) {
             currentRotationY = 180;
             image.color = startColor;
-            controller.StopScanning();
+            if (!noAction) controller.StopScanning();
         } else {
             currentRotationY = 0;
             image.color = stopColor;
-            controller.StartScanning();
+            if (!noAction) controller.StartScanning();
         }
         timer = 0;
         state = State.Transitioning;
@@ -58,6 +59,7 @@ public class GazeButton : MonoBehaviour {
         // Debug.Log($"State: {state}");
         Ray ray = new Ray(CoreServices.InputSystem.GazeProvider.GazeOrigin, CoreServices.InputSystem.GazeProvider.GazeDirection);
         isGazing = Physics.Raycast(ray, out RaycastHit hitInfo, 10, gazableMask);
+        isGazing = Enabled && isGazing;
         if (state == State.Transitioning) {
             timer += Time.deltaTime;
             transform.localRotation = Quaternion.Euler(0, currentRotationY + 180 * timer / TRANSITION_DURATION, 0);

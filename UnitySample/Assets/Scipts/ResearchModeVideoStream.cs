@@ -74,16 +74,12 @@ public class ResearchModeVideoStream : MonoBehaviour
     public Renderer RawDataStreamingLED;
     public bool RawDataStreaming { get; private set; } = false;
 
-    public Renderer InteractionStreamingLED;
-    public bool InteractionStreaming { get; private set; } = false;
-
     public Renderer PointCloudStreamingLED;
     public bool PointCloudStreaming { get; private set; } = false;
 
     private void Awake()
     {
         if (RawDataStreamingLED) RawDataStreamingLED.material.color = Color.red;
-        if (InteractionStreamingLED) InteractionStreamingLED.material.color = Color.red;
         if (PointCloudStreamingLED) PointCloudStreamingLED.material.color = Color.red;
 #if ENABLE_WINMD_SUPPORT
 #if UNITY_2020_1_OR_NEWER // note: Unity 2021.2 and later not supported
@@ -165,7 +161,7 @@ public class ResearchModeVideoStream : MonoBehaviour
         if (depthSensorMode == DepthSensorMode.LongThrow) researchMode.InitializeLongDepthSensor();
         else if (depthSensorMode == DepthSensorMode.ShortThrow) researchMode.InitializeDepthSensor();
         
-        researchMode.InitializeSpatialCamerasFront();
+        // researchMode.InitializeSpatialCamerasFront();
         researchMode.SetReferenceCoordinateSystem(unityWorldOrigin);
         researchMode.SetPointCloudDepthOffset(0);
 
@@ -173,7 +169,7 @@ public class ResearchModeVideoStream : MonoBehaviour
         if (depthSensorMode == DepthSensorMode.LongThrow) researchMode.StartLongDepthSensorLoop(enablePointCloud);
         else if (depthSensorMode == DepthSensorMode.ShortThrow) researchMode.StartDepthSensorLoop(false, false, enablePointCloud);
 
-        researchMode.StartSpatialCamerasFrontLoop();
+        // researchMode.StartSpatialCamerasFrontLoop();
 
         UnityEngine.WSA.Application.InvokeOnUIThread(() =>
         {
@@ -317,7 +313,7 @@ public class ResearchModeVideoStream : MonoBehaviour
             }
         }
 
-        // update LF camera texture
+        /* // update LF camera texture
         if (startRealtimePreview && LFPreviewPlane != null && researchMode.LFImageUpdated())
         {
             long ts;
@@ -356,7 +352,7 @@ public class ResearchModeVideoStream : MonoBehaviour
                 RFMediaTexture.LoadRawTextureData(RFFrameData);
                 RFMediaTexture.Apply();
             }
-        }
+        } */
 
         // Update point cloud
         UpdatePointCloud();
@@ -408,6 +404,7 @@ public class ResearchModeVideoStream : MonoBehaviour
 
     public Vector3[] FloatToVector3(float[] pointCloud)
     {
+        if (pointCloud.Length % 3 != 0) return new Vector3[] {};
         int pointCloudLength = pointCloud.Length / 3;
         Vector3[] pointCloudVector3 = new Vector3[pointCloudLength];
         for (int i = 0; i < pointCloudLength; i++)
@@ -479,22 +476,6 @@ public class ResearchModeVideoStream : MonoBehaviour
                 tcpClient.SendFloatAsync("s", data.ToArray(), false);  // must not be dropped
 #endif
             }
-        }
-    }
-
-    public void ToggleInteractionStreamingEvent() {
-        if (!InteractionStreaming) 
-        {
-            if (tcpClient.Connected) 
-            {
-                InteractionStreaming = true;
-                InteractionStreamingLED.material.color = Color.green;
-            }
-            
-        } else 
-        {
-            InteractionStreaming = false;
-            InteractionStreamingLED.material.color = Color.red;
         }
     }
     
