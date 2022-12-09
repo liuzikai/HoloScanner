@@ -54,8 +54,7 @@ bool TerminalSocketBase::sendBytes(const std::string &name, uint8_t *data, size_
     // Data
     if (size != 0) {
         assert(data != nullptr);
-        buf->resize(buf->size() + size);
-        ::memcpy(buf->data() + (buf->size() - size), data, size);
+        buf->insert(buf->end(), data, data + size);
     }
 
     // Send the data

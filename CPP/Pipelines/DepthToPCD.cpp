@@ -6,10 +6,9 @@
 #include <igl/readTGF.h>
 #include <igl/readDMAT.h>
 #include <igl/opengl/glfw/Viewer.h>
-
+#include <igl/opengl/glfw/imgui/ImGuiPlugin.h>
 #include <igl/opengl/glfw/imgui/ImGuiMenu.h>
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
-#include <igl/slice.h>
 
 #include <iostream>
 
@@ -68,15 +67,18 @@ Registrator registrator;
 
 // Data exchanged between threads
 
+enum DisplayMode { CURRENT_FRAME_PCD, RECONSTRUCTED_PCD };
+DisplayMode displayMode = RECONSTRUCTED_PCD;  // not well protected against multithread, reader should handle carefully
+
 std::mutex handDebugFrameLock;
 bool handDebugFrameValid = false;
 HandDebugFrame handDebugFrame;
 bool handDebugFrameUpdated = false;
 
-std::mutex reconstructedPCDLock;
-Eigen::MatrixXd reconstructedPCD;
-Eigen::RowVector3d reconstructedPCDColor;
-bool reconstructedPCDUpdated = false;
+std::mutex displayPCDLock;
+Eigen::MatrixXd displayPCD;
+Eigen::RowVector3d displayPCDColor;
+bool displayPCDUpdated = false;
 
 std::thread depthToPCDThread([] {
     while (!shouldExit) {
@@ -106,19 +108,16 @@ std::thread depthToPCDThread([] {
 
 /**
  * Send reconstructed PCD and set shared variables to update the viewer
- * @param objectPCD  NOTICE: will be std::moved
+ * @param pcdInMatrix  NOTICE: will be std::moved
  * @param color
  */
-void sendAndViewReconstructedPCD(Eigen::MatrixXd &objectPCD, const Eigen::RowVector3d &color) {
-    // Send the PCD
-    tcpDataSource.sendReconstructedPCD(color, objectPCD);
-
+void setDisplayPCD(Eigen::MatrixXd &pcdInMatrix, const Eigen::RowVector3d &color) {
     // Give the PCD to the viewer (safe to std::move since we don't need it anymore)
     {
-        std::lock_guard _(reconstructedPCDLock);
-        reconstructedPCD = std::move(objectPCD);
-        reconstructedPCDColor = color;
-        reconstructedPCDUpdated = true;
+        std::lock_guard _(displayPCDLock);
+        displayPCD = std::move(pcdInMatrix);
+        displayPCDColor = color;
+        displayPCDUpdated = true;
     }
 }
 
@@ -134,12 +133,20 @@ std::thread registrationThread([] {
         if (registratorShouldReset) {
             std::cout << "========== RECEIVED STOP SIGNAL ===========" << std::endl;
 
-            registrator.saveReconstructedMesh("FinalMesh.ply");  // change PCD
+            try {
+                registrator.saveReconstructedMesh();  // will change PCD inside
+            } catch (...) {
+                std::cerr << "Error saving results" << std::endl;
+            }
 
             Eigen::MatrixXd objectPCD;
             if (registrator.getReconstructedPCDInEigenFormat(objectPCD)) {
                 std::cout << "[FinalPCD] " << objectPCD.size() << std::endl;
-                sendAndViewReconstructedPCD(objectPCD, Eigen::RowVector3d(0, 0.8, 1));
+                tcpDataSource.sendReconstructedPCD(Eigen::RowVector3d(0, 0.8, 1), objectPCD);
+                if (displayMode == RECONSTRUCTED_PCD) {
+                    setDisplayPCD(objectPCD, Eigen::RowVector3d(0, 0.8, 1));
+                    // NOTICE: objectPCD is moved
+                }
             } else {
                 std::cout << "No reconstructed PCD available" << std::endl;
             }
@@ -189,12 +196,24 @@ std::thread registrationThread([] {
             Eigen::MatrixXd objectPCD;
             if (registrator.getReconstructedPCDInEigenFormat(objectPCD)) {
 #if 1
-                std::cout << "[ReconstructedPCD] " << objectPCD.size() << "  succeeded = " << succeeded << std::endl;
+                std::cout << "[ReconstructedPCD] " << objectPCD.rows() << "  succeeded = " << succeeded << std::endl;
 #endif
-                sendAndViewReconstructedPCD(objectPCD, POINT_COLOR[succeeded]);
+                tcpDataSource.sendReconstructedPCD(POINT_COLOR[succeeded], objectPCD);
+
+                if (displayMode == RECONSTRUCTED_PCD) {
+                    setDisplayPCD(objectPCD, POINT_COLOR[succeeded]);
+                    // NOTICE: objectPCD is moved
+                }
             }
 
-
+            if (displayMode == CURRENT_FRAME_PCD) {
+                Eigen::MatrixXd points(pcd.size(), 3);
+                for (int i = 0; i < pcd.size(); i++) {
+                    points.row(i) = pcd[i];
+                }
+                setDisplayPCD(points, Eigen::RowVector3d(1, 1, 1));
+                // NOTICE: pcd is moved, so this must be placed at last
+            }
         }
 
     }
@@ -224,11 +243,11 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
     }
 
     {
-        std::lock_guard _(reconstructedPCDLock);
-        if (reconstructedPCDUpdated) {
-            pcd = std::move(reconstructedPCD);  // safe to move since it's only used to pass in here
-            pcdColor = std::move(reconstructedPCDColor);
-            reconstructedPCDUpdated = false;
+        std::lock_guard _(displayPCDLock);
+        if (displayPCDUpdated) {
+            pcd = std::move(displayPCD);  // safe to move since it's only used to pass in here
+            pcdColor = std::move(displayPCDColor);
+            displayPCDUpdated = false;
             redraw = true;
         }
     }
@@ -282,6 +301,22 @@ int main() {
     std::ios::sync_with_stdio(false);
 
     igl::opengl::glfw::Viewer viewer;
+
+    // Menu
+    igl::opengl::glfw::imgui::ImGuiPlugin plugin;
+    viewer.plugins.push_back(&plugin);
+    igl::opengl::glfw::imgui::ImGuiMenu menu;
+    plugin.widgets.push_back(&menu);
+    menu.callback_draw_viewer_menu = [&]() {
+        menu.draw_viewer_menu();  // draw parent menu content
+
+        if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_DefaultOpen)) {
+            if(ImGui::Combo("Display mode", (int*)(&displayMode), "CURRENT_FRAME_PCD\0RECONSTRUCTED_PCD\0\0")) {
+                // nothing
+            }
+        }
+    };
+
     viewer.callback_pre_draw = callBackPerDraw;
     viewer.core().set_rotation_type(igl::opengl::ViewerCore::ROTATION_TYPE_TRACKBALL);
     viewer.data().point_size = 2;

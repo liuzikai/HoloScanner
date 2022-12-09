@@ -35,7 +35,7 @@ TCPDataSource::~TCPDataSource() {
 
 bool TCPDataSource::sendReconstructedPCD(const Eigen::RowVector3d &pointColor, const Eigen::MatrixXd &pcd) {
     std::vector<float> data;
-    data.reserve(3 + pcd.size() * 3);
+    data.reserve(3 + pcd.rows() * 3);
     data.emplace_back((float) pointColor(0));
     data.emplace_back((float) pointColor(1));
     data.emplace_back((float) pointColor(2));

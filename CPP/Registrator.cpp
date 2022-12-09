@@ -2,13 +2,15 @@
 // Created by Noureddine Gueddach on 21/11/2022.
 //
 
+#include <memory>
+#include <filesystem>
 #include "open3d/Open3D.h"
 #include "Registrator.h"
-#include <memory>
 
 using namespace open3d;
 using std::cout;
 using std::endl;
+namespace fs = std::filesystem;
 
 void Registrator::reset() {
     m_pcd = nullptr;
@@ -167,8 +169,8 @@ void Registrator::updatePCDMatrixFromPCD() {// Convert to Eigen matrix format
     }
 }
 
-void Registrator::update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd,
-                             std::vector<long unsigned int> &index) const {
+void Registrator::manualUpdatePCD(const std::shared_ptr<open3d::geometry::PointCloud> &pcd,
+                                  std::vector<long unsigned int> &index) const {
     PCD points = pcd->points_;
     PCD new_points;
     for (int i = 0; i < index.size(); ++i) {
@@ -177,14 +179,23 @@ void Registrator::update_pcd(const std::shared_ptr<open3d::geometry::PointCloud>
     pcd->points_ = new_points;
 }
 
-void Registrator::saveReconstructedMesh(const std::string &save_path) {
+void Registrator::saveReconstructedMesh() {
     if (!m_pcd) return;
-    std::shared_ptr<open3d::geometry::TriangleMesh> mesh;
-    std::vector<double> densities;
-    m_pcd->EstimateNormals();
+
+    // DATA_FOLDER defined in CMakeLists.txt
+    const fs::path dataFolder = fs::path(DATA_FOLDER) / currentTimeString();
+    if (!fs::exists(dataFolder)) {
+        fs::create_directories(dataFolder);
+    }
+
+    // Save PCD before possibly FINAL_DBSCAN
+    auto pcdFilename = dataFolder / "Final.xyz";
+    std::cout << "Writing PCD to " << pcdFilename << std::endl;
+    open3d::io::WritePointCloudToXYZ(pcdFilename.string(), *m_pcd, {});
+
 #ifdef FINAL_DBSCAN
     std::vector<size_t> index = std::get<1>(m_pcd->RemoveStatisticalOutliers(16, 0.8));
-    update_pcd(m_pcd, index);
+    manualUpdatePCD(m_pcd, index);
     std::vector<int> labels = m_pcd->ClusterDBSCAN(0.013, 64);
     std::set<int> labels_unique;
     for (int i = 0; i < labels.size(); ++i) {
@@ -206,13 +217,50 @@ void Registrator::saveReconstructedMesh(const std::string &save_path) {
     }
     size_t argmax = std::distance(labels_num.begin(), std::max_element(labels_num.begin(), labels_num.end()));
     // auto m_pcd = m_pcd->SelectByIndex(labels_index[argmax]);
-    update_pcd(m_pcd, labels_index[argmax]);
+    manualUpdatePCD(m_pcd, labels_index[argmax]);
     // m_pcd = std::make_shared<open3d::geometry::PointCloud>(pcd);
 
     updatePCDMatrixFromPCD();
+
+    // Save PCD before possibly FINAL_DBSCAN
+    auto afterSBScanPCDFilename = dataFolder / "AfterDBScan.xyz";
+    std::cout << "Writing post-DBScan PCD to " << afterSBScanPCDFilename << std::endl;
+    open3d::io::WritePointCloudToXYZ(afterSBScanPCDFilename.string(), *m_pcd, {});
 #endif
+
+    std::shared_ptr<open3d::geometry::TriangleMesh> mesh;
+    std::vector<double> densities;
+
     float scale = 3;
     m_pcd->EstimateNormals();
     std::tie(mesh, densities) = geometry::TriangleMesh::CreateFromPointCloudPoisson(*m_pcd, 8UL, 0, scale);
-    io::WriteTriangleMesh(save_path, *mesh);
+
+    // Save final mesh
+    auto meshFilename = dataFolder / "Poisson.ply";
+    std::cout << "Writing mesh to " << meshFilename << std::endl;
+    io::WriteTriangleMesh(meshFilename.string(), *mesh);
+}
+
+std::string Registrator::currentTimeString() {
+    // Reference: https://stackoverflow.com/questions/24686846/get-current-time-in-milliseconds-or-hhmmssmmm-format
+
+    using namespace std::chrono;
+
+    // Get current time
+    auto now = system_clock::now();
+
+    // Get number of milliseconds for the current second
+    // (remainder after division into seconds)
+    auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+
+    // Convert to std::time_t in order to convert to std::tm (broken time)
+    auto timer = system_clock::to_time_t(now);
+
+    // Convert to broken time
+    std::tm bt = *std::localtime(&timer);
+
+    std::ostringstream oss;
+    oss << std::put_time(&bt, "%Y%m%d_%H%M%S");
+
+    return oss.str();
 }

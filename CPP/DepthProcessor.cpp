@@ -452,13 +452,13 @@ bool DepthProcessor::update(const RawDataFrame &input) {
     auto midpoint = (lwTranf + rwTransf) * 0.5f;
 
     DirectX::XMMATRIX cam2world = cam2rig * input.rig2world;
-    midpoint = XMVector3Transform(midpoint, XMMatrixInverse(nullptr, cam2world));
+    midpoint = XMVector3Transform(midpoint, XMMatrixInverse(nullptr, input.rig2world));
 
     auto midpZ = static_cast<uint16_t>(XMVectorGetZ(midpoint) * 1000.0f);
     auto depthNearClip = midpZ - DEPTH_FILTER_OFFSET;
     auto depthFarClip = midpZ + DEPTH_FILTER_OFFSET;
 #if 0
-    std::cout << "depthNearClip = " << depthNearClip << ", depthFarClip = " << depthFarClip << std::endl;
+    std::cout << "midpZ = " << midpZ << ", depthNearClip = " << depthNearClip << ", depthFarClip = " << depthFarClip << std::endl;
 #endif
 
     size_t bufferInd = stdLogIndex;

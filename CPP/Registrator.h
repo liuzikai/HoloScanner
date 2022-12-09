@@ -49,9 +49,8 @@ public:
 
     /**
      * @brief Construct a mesh from the point cloud and save it to disk
-     * @param save_path path to which the mesh should be saved
      */
-    void saveReconstructedMesh(const std::string &save_path);
+    void saveReconstructedMesh();
 
     void reset();
 
@@ -65,7 +64,7 @@ private:
     Eigen::MatrixXd pcdMatrix;
     std::mutex pcdMatrixLock;
 
-    void update_pcd(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const;
+    void manualUpdatePCD(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const;
 
     /**
      * @brief Construct a new is Registration Successful object
@@ -89,4 +88,6 @@ private:
                                       double kernel_param) const;
 
     void updatePCDMatrixFromPCD();
+
+    static std::string currentTimeString();
 };
