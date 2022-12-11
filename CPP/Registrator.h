@@ -54,6 +54,15 @@ public:
 
     void reset();
 
+    /**
+     * @brief Post-Process the point cloud, i.e. apply DB-SCAN, denoising and marching cubes
+     * This is a quasi-replacement to saveReconstructedMesh
+     * 
+     * @param V Vertices of reconstructed mesh
+     * @param F Faces of reconstructed mesh
+     */
+    void postProcess(Eigen::MatrixXd& V, Eigen::MatrixXi& F) const;
+
 private:
     std::shared_ptr<open3d::geometry::PointCloud> m_pcd;
     float m_max_corr_dist_transformation = 0.005;
@@ -90,4 +99,24 @@ private:
     void updatePCDMatrixFromPCD();
 
     static std::string currentTimeString();
+
+    /**
+     * @brief Denoise the point cloud using an external python deep-learning based denoiser
+     * 
+     * @param pcd the point cloud to denoise 
+     */
+    void denoise(const std::shared_ptr<open3d::geometry::PointCloud>& pcd) const;
+
+    /**
+     * @brief Custom algorithm that acts as a fill-tool similar to what can be found in Paint/Photoshop/Gimp
+     * but in 3D. This is in preparation for marching cubes
+     * 
+     * @param pcd point cloud to process
+     * @param resolution 
+     * @param grid_points discretized points of the point cloud
+     * @param grid_values value at each point. A value > 0 indicates the point is outside the object
+     * whereas a value < 0 indicates the point is inside the object.
+     */
+    void flood(const std::shared_ptr<open3d::geometry::PointCloud>& pcd, 
+        const Eigen::Vector3d& resolution, Eigen::MatrixXd& grid_points, Eigen::VectorXd& grid_values) const;
 };
