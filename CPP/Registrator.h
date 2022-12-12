@@ -75,7 +75,7 @@ private:
     mutable Eigen::MatrixXd pcdMatrix;
     mutable std::mutex pcdMatrixLock;
 
-    void manualUpdatePCD(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const;
+    void manualUpdatePCD(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, const std::vector<size_t> &index) const;
 
     /**
      * @brief Construct a new is Registration Successful object
