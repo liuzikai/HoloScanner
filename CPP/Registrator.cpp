@@ -160,7 +160,7 @@ bool Registrator::mergePCD(const PCD &pcd_)
     return true;
 }
 
-void Registrator::updatePCDMatrixFromPCD() {// Convert to Eigen matrix format
+void Registrator::updatePCDMatrixFromPCD() const {// Convert to Eigen matrix format
     Eigen::MatrixXd mat;
     mat.resize((long) m_pcd->points_.size(), 3);
     for (int i = 0; i < m_pcd->points_.size(); i++) {
@@ -440,6 +440,8 @@ void Registrator::saveReconstructedMesh() {
 
     float scale = 3;
     m_pcd->EstimateNormals();
+    std::shared_ptr<geometry::TriangleMesh> mesh;
+    std::vector< double > densities;
     std::tie(mesh, densities) = geometry::TriangleMesh::CreateFromPointCloudPoisson(*m_pcd, 8UL, 0, scale);
 
     // Save final mesh

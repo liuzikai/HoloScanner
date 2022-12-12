@@ -21,6 +21,8 @@
 #include "Registrator.h"
 #include "MeshProcessor.h"
 
+igl::opengl::glfw::Viewer viewer;
+
 class DepthProcessorWrapper : public DepthProcessor, public PCDSource {
 public:
 
@@ -123,7 +125,7 @@ void setDisplayPCD(Eigen::MatrixXd &pcdInMatrix, const Eigen::RowVector3d &color
     }
 }
 
-std::thread registrationThread([] {
+std::thread registrationThread([viewer] {
     constexpr int WARM_UP_FRAME_COUNT = 20;
 
     int warmUPFrameRemaining = WARM_UP_FRAME_COUNT;
@@ -322,7 +324,7 @@ bool callBackPerDraw(igl::opengl::glfw::Viewer &viewer) {
 int main() {
     std::ios::sync_with_stdio(false);
 
-    igl::opengl::glfw::Viewer viewer;
+    // igl::opengl::glfw::Viewer viewer;
 
     // Menu
     igl::opengl::glfw::imgui::ImGuiPlugin plugin;

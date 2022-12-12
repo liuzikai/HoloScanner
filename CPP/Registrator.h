@@ -63,7 +63,7 @@ public:
      */
     void postProcess(Eigen::MatrixXd& V, Eigen::MatrixXi& F) const;
 
-    void denoise(const std::shared_ptr<open3d::geometry::PointCloud>& pcd) const;
+    // void denoise(const std::shared_ptr<open3d::geometry::PointCloud>& pcd) const;
 
 private:
     std::shared_ptr<open3d::geometry::PointCloud> m_pcd;
@@ -72,8 +72,8 @@ private:
     float m_max_rmse = 0.004;
     float m_min_fitness = 0.97;
 
-    Eigen::MatrixXd pcdMatrix;
-    std::mutex pcdMatrixLock;
+    mutable Eigen::MatrixXd pcdMatrix;
+    mutable std::mutex pcdMatrixLock;
 
     void manualUpdatePCD(const std::shared_ptr<open3d::geometry::PointCloud> &pcd, std::vector<long unsigned int> &index) const;
 
@@ -98,7 +98,7 @@ private:
                                       const open3d::geometry::PointCloud &target, Eigen::Matrix6d &InfoMat,
                                       double kernel_param) const;
 
-    void updatePCDMatrixFromPCD();
+    void updatePCDMatrixFromPCD() const;
 
     static std::string currentTimeString();
 
