@@ -389,6 +389,7 @@ void Registrator::flood(const std::shared_ptr<open3d::geometry::PointCloud>& pcd
 void Registrator::saveReconstructedMesh() {
     if (!m_pcd) return;
 
+
     // DATA_FOLDER defined in CMakeLists.txt
     const fs::path dataFolder = fs::path(DATA_FOLDER) / currentTimeString();
     if (!fs::exists(dataFolder)) {
@@ -435,8 +436,7 @@ void Registrator::saveReconstructedMesh() {
     open3d::io::WritePointCloudToXYZ(afterSBScanPCDFilename.string(), *m_pcd, {});
 #endif
 
-    std::shared_ptr<open3d::geometry::TriangleMesh> mesh;
-    std::vector<double> densities;
+    denoise(m_pcd);
 
     float scale = 3;
     m_pcd->EstimateNormals();
