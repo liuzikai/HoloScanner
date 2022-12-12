@@ -174,7 +174,7 @@ void Registrator::updatePCDMatrixFromPCD() const {// Convert to Eigen matrix for
 }
 
 void Registrator::manualUpdatePCD(const std::shared_ptr<open3d::geometry::PointCloud> &pcd,
-                                  const std::vector<long unsigned int> &index) const {
+                                  const std::vector<size_t> &index) const {
     PCD points = pcd->points_;
     PCD new_points;
     for (int i = 0; i < index.size(); ++i) {
