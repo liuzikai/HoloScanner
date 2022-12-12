@@ -6,6 +6,10 @@
 #include <filesystem>
 #include "open3d/Open3D.h"
 #include "Registrator.h"
+#include <string>
+#include <fstream>
+#include <queue>
+#include <igl/copyleft/marching_cubes.h>
 
 using namespace open3d;
 using std::cout;
@@ -179,6 +183,209 @@ void Registrator::manualUpdatePCD(const std::shared_ptr<open3d::geometry::PointC
     pcd->points_ = new_points;
 }
 
+void Registrator::denoise(const std::shared_ptr<open3d::geometry::PointCloud>& pcd) const {
+    try {
+        std::string noisy_file_name = "noisy_pcd.xyz";
+        std::string denoised_file_name = "denoised_pcd.xyz";
+        cout << "\nWriting  noisy pcd to file: " + noisy_file_name << endl;
+        std::ofstream ostream("../noisy/" + noisy_file_name, std::ofstream::out);
+        if (ostream.is_open()) {
+            for (int i = 0; i < pcd->points_.size(); i++) {
+                ostream << pcd->points_[i](0) << " " << pcd->points_[i](1) << " " << pcd->points_[i](2) << "\n";
+            }
+            ostream.close();
+        } else {
+            cout << "Could not create file: " + noisy_file_name << endl;
+        }
+        cout << "Finished writing noisy pcd to file! Handing over to Python" << endl;
+        std::string command = std::string("cd ../ext/score-denoise && python test_single.py --input_xyz ../../noisy/") 
+            + noisy_file_name + " --output_xyz ../../denoised/" + denoised_file_name;
+        system(command.c_str());
+        cout << "Finished denoising!" << endl;
+
+        //Read back the denoised point cloud
+        cout << "C++ takes over. Reading the denoised point cloud..." << endl;
+        pcd->points_.clear();
+        std::ifstream istream("../denoised/" + denoised_file_name, std::ifstream::in);
+        //std::ifstream istream("../finaldenoisedboxdb.xyz", std::ifstream::in);
+        for(std::string line; std::getline(istream, line); ) { //read stream line by line
+            std::istringstream in(line); //make a stream for the line itself
+            float x, y, z;
+            in >> x >> y >> z;
+            pcd->points_.push_back(Eigen::Vector3d(x, y, z));
+        }
+        cout << "Finished reading back the denoised pcd" << endl;
+
+    } catch (const char* msg) {
+        std::cerr << msg << endl;
+    }
+}
+
+void Registrator::flood(const std::shared_ptr<open3d::geometry::PointCloud>& pcd, 
+    const Eigen::Vector3d& resolution, Eigen::MatrixXd& grid_points, Eigen::VectorXd& grid_values) const {
+    using std::vector;
+    //#########################################
+    //Note: Assumes the point cloud is closed #
+    //#########################################
+
+    //Discretize points and create a thick boundary out of them
+    Eigen::Vector3d min = pcd->GetMinBound();
+    Eigen::Vector3d max = pcd->GetMaxBound();
+    Eigen::Vector3d extents = max - min;
+    Eigen::Vector3d extents_inv = Eigen::Vector3d(1/extents.x(), 1/extents.y(), 1/extents.z());
+    size_t n = pcd->points_.size();
+    Eigen::Vector3d resolution_inv = Eigen::Vector3d(1/resolution.x(), 1/resolution.y(), 1/resolution.z());
+    vector<vector<vector<uint8_t>>>* occupancy = new vector<vector<vector<uint8_t>>>(resolution.x(), 
+        vector<vector<uint8_t>>(resolution.y(), vector<uint8_t>(resolution.z(), 0)));
+    for(int i = 0; i < n; i++) {
+        Eigen::Vector3d point = (pcd->points_[i] - min)
+            .cwiseProduct(extents_inv).cwiseProduct(resolution);
+        int x_ = (int)point.x();
+        int y_ = (int)point.y();
+        int z_ = (int)point.z();
+        //Set each neighboring as a boundary point
+        //This thickness is necessary so that we don't accidentally cross the boundary
+        //when flooding
+        for(int i = -1; i <= 1; i++) {
+            for(int j = -1; j <= 1; j++) {
+                for(int k = -1; k <= 1; k++) {
+                    int x = x_ + i;
+                    int y = y_ + j;
+                    int z = z_ + k;
+                    if(x >= 0 && x < resolution.x() && 
+                       y >= 0 && y < resolution.y() && 
+                       z >= 0 && z < resolution.z()) {
+                        (*occupancy)[x][y][z] = 1;
+                    }
+                }
+            }
+        }
+    }
+    
+    //#######################################################################
+    //Note: The key assumption here is that the center point will be inside #
+    //the shape. If this does not hold then nothing works.                  #
+    //#######################################################################
+
+    //Compute the center of the point cloud.
+    Eigen::Vector3d center = (pcd->GetCenter() - min)
+        .cwiseProduct(extents_inv).cwiseProduct(resolution);
+    std::queue<Eigen::Vector3i> q;
+    q.push(Eigen::Vector3i((int)center.x(), (int)center.y(), (int)center.z()));
+    vector<Eigen::Vector3d> inner_points;
+    //Flood the inside of the shape, BFS style
+    while(!q.empty()) {
+        Eigen::Vector3i p = q.front();
+        q.pop();
+        if((*occupancy)[p.x()][p.y()][p.z()] != 0)
+            continue;
+        (*occupancy)[p.x()][p.y()][p.z()] = 2;
+        Eigen::Vector3d w_p = Eigen::Vector3d(p.x(), p.y(), p.z())
+            .cwiseProduct(resolution_inv).cwiseProduct(extents) + min;
+        inner_points.push_back(w_p);
+        for(int i = -1; i <= 1; i++) {
+            for(int j = -1; j <= 1; j++) {
+                for(int k = -1; k <= 1; k++) {
+                    int x = p.x() + i;
+                    int y = p.y() + j;
+                    int z = p.z() + k;
+                    if(x >= 0 && x < resolution.x() && 
+                       y >= 0 && y < resolution.y() && 
+                       z >= 0 && z < resolution.z()) {
+                        if(!(i == 0 && j == 0 && k == 0)) {
+                            short val = (*occupancy)[x][y][z];
+                            if(val == 0) {
+                                q.push(Eigen::Vector3i(x, y, z));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    cout << "====SIZE: " << inner_points.size() << endl;
+
+    //Expand the volume to compensate for the thick boundary
+    vector<Eigen::Vector3i> expanded_points;
+    for(int x = 0; x < resolution.x(); x++) {
+        for(int y = 0; y < resolution.y(); y++) {
+            for(int z = 0; z < resolution.z(); z++) {
+                bool found_neighbor = false;
+                if((*occupancy)[x][y][z] == 2)
+                    continue;
+                for(int i = -1; i <= 1 && !found_neighbor; i++) {
+                    for(int j = -1; j <= 1 && !found_neighbor; j++) {
+                        for(int k = -1; k <= 1 && !found_neighbor; k++) {
+                            int x_ = x + i;
+                            int y_ = y + j;
+                            int z_ = z + k;
+                            if(x_ >= 0 && x_ < resolution.x() && 
+                               y_ >= 0 && y_ < resolution.y() && 
+                               z_ >= 0 && z_ < resolution.z()) {
+                                if((*occupancy)[x_][y_][z_] == 2) {
+                                    expanded_points.push_back(Eigen::Vector3i(x, y, z));
+                                    found_neighbor = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for(auto p : expanded_points) {
+        (*occupancy)[p.x()][p.y()][p.z()] = 2;
+    }
+
+    //Put the result in the appropriate data structures in preparation for marching cubes
+    //Also update the pcd, although from here on the pcd should not be relevant anymore
+    int N = resolution.x() * resolution.y() * resolution.z();
+    grid_points.resize(N, 3);
+    grid_values.resize(N);
+    grid_values.setOnes(); //points are outside the shape by default
+    pcd->points_.clear();
+    bool dense = true;
+    int ii = 0;
+    for(int x = 0; x < resolution.x(); x++) {
+        for(int y = 0; y < resolution.y(); y++) {
+            for(int z = 0; z < resolution.z(); z++, ii++) {
+                Eigen::Vector3d w_p = Eigen::Vector3d(x, y, z)
+                    .cwiseProduct(resolution_inv).cwiseProduct(extents) + min;
+                grid_points.row(ii) = w_p.transpose();
+
+                bool found_neighbor = false;
+                if((*occupancy)[x][y][z] == 2) {
+                    if(dense) {
+                        pcd->points_.push_back(w_p);
+                        grid_values(ii) = -2; //inner point
+                    }
+                    continue;
+                }
+                for(int i = -1; i <= 1 && !found_neighbor; i++) {
+                    for(int j = -1; j <= 1 && !found_neighbor; j++) {
+                        for(int k = -1; k <= 1 && !found_neighbor; k++) {
+                            int x_ = x + i;
+                            int y_ = y + j;
+                            int z_ = z + k;
+                            if(x_ >= 0 && x_ < resolution.x() && 
+                               y_ >= 0 && y_ < resolution.y() && 
+                               z_ >= 0 && z_ < resolution.z()) {
+                                if((*occupancy)[x_][y_][z_] == 2) {
+                                    found_neighbor = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                if(found_neighbor) {
+                    pcd->points_.push_back(w_p);
+                    grid_values(ii) = -0.5; //inner point close to the surface
+                }
+            }
+        }
+    }
+}
+
 void Registrator::saveReconstructedMesh() {
     if (!m_pcd) return;
 
@@ -239,6 +446,70 @@ void Registrator::saveReconstructedMesh() {
     auto meshFilename = dataFolder / "Poisson.ply";
     std::cout << "Writing mesh to " << meshFilename << std::endl;
     io::WriteTriangleMesh(meshFilename.string(), *mesh);
+}
+
+void Registrator::postProcess(Eigen::MatrixXd& V, Eigen::MatrixXi& F) const {
+    if (!m_pcd) return;
+
+    // DATA_FOLDER defined in CMakeLists.txt
+    const fs::path dataFolder = fs::path(DATA_FOLDER) / currentTimeString();
+    if (!fs::exists(dataFolder)) {
+        fs::create_directories(dataFolder);
+    }
+
+    // Save PCD before possibly FINAL_DBSCAN
+    auto pcdFilename = dataFolder / "Final.xyz";
+    std::cout << "Writing PCD to " << pcdFilename << std::endl;
+    open3d::io::WritePointCloudToXYZ(pcdFilename.string(), *m_pcd, {});
+
+#ifdef FINAL_DBSCAN
+    std::vector<size_t> index = std::get<1>(m_pcd->RemoveStatisticalOutliers(16, 0.8));
+    manualUpdatePCD(m_pcd, index);
+    std::vector<int> labels = m_pcd->ClusterDBSCAN(0.013, 64);
+    std::set<int> labels_unique;
+    for (int i = 0; i < labels.size(); ++i) {
+        if (labels[i] >= 0) {
+            labels_unique.insert(labels[i]);
+        }
+    }
+    // some recording for each cluster
+    std::vector<size_t> labels_num(labels_unique.size(), 0);
+    std::vector<std::vector<size_t>> labels_index;
+    for (int i = 0; i < labels_unique.size(); ++i) {
+        labels_index.push_back(std::vector<size_t>());
+    }
+    for (size_t i = 0; i < labels.size(); ++i) {
+        if (labels[i] >= 0) {
+            labels_num[labels[i]]++;
+            labels_index[labels[i]].push_back(i);
+        }
+    }
+    size_t argmax = std::distance(labels_num.begin(), std::max_element(labels_num.begin(), labels_num.end()));
+    // auto m_pcd = m_pcd->SelectByIndex(labels_index[argmax]);
+    manualUpdatePCD(m_pcd, labels_index[argmax]);
+    // m_pcd = std::make_shared<open3d::geometry::PointCloud>(pcd);
+
+    updatePCDMatrixFromPCD();
+
+    // Save PCD before possibly FINAL_DBSCAN
+    auto afterSBScanPCDFilename = dataFolder / "AfterDBScan.xyz";
+    std::cout << "Writing post-DBScan PCD to " << afterSBScanPCDFilename << std::endl;
+    open3d::io::WritePointCloudToXYZ(afterSBScanPCDFilename.string(), *m_pcd, {});
+#endif
+
+    denoise(m_pcd); //Might want to remove if the python denoiser is not available
+
+    Eigen::Vector3d resolution = Eigen::Vector3d(70, 70, 70);
+    Eigen::MatrixXd grid_points;
+    Eigen::VectorXd grid_values;
+    flood(m_pcd, resolution, grid_points, grid_values);
+
+    igl::copyleft::marching_cubes(grid_values, grid_points, resolution.x(), resolution.y(), resolution.z(), V, F);
+    m_pcd->points_.clear();
+    for(int i = 0; i < V.rows(); i++) {
+        m_pcd->points_.push_back(V.row(i).transpose());
+    }
+    cout << "Finished Marching Cubes" << endl;
 }
 
 std::string Registrator::currentTimeString() {

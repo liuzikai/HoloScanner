@@ -19,6 +19,7 @@
 #include "EigenHelpers.h"
 #include "PCDDataTypes.h"
 #include "Registrator.h"
+#include "MeshProcessor.h"
 
 class DepthProcessorWrapper : public DepthProcessor, public PCDSource {
 public:
@@ -64,6 +65,7 @@ TCPDataSource tcpDataSource([] {
 std::unique_ptr<DepthProcessorWrapper> depthProcessor;
 
 Registrator registrator;
+MeshProcessor meshProcessor;
 
 // Data exchanged between threads
 
@@ -135,6 +137,26 @@ std::thread registrationThread([] {
 
             try {
                 registrator.saveReconstructedMesh();  // will change PCD inside
+
+                Eigen::MatrixXd V, smoothV;
+                Eigen::MatrixXi F;
+                Eigen::MatrixXd N;
+                registrator.postProcess(V, F);
+
+                meshProcessor.smoothMesh(V, F, smoothV);
+
+                meshProcessor.saveMesh("../rough_mesh.ply", V, F);
+                meshProcessor.saveMesh("../smooth_mesh.ply", smoothV, F);
+
+                igl::per_face_normals(smoothV, F, N);
+
+                viewer.data().clear();
+
+                viewer.data().set_mesh(smoothV, F);
+                viewer.data().show_lines = true;
+                viewer.data().show_faces = true;
+                viewer.data().set_normals(-N); //Might want to change the sign if the normals are flipped
+                viewer.core().align_camera_center(smoothV);
             } catch (...) {
                 std::cerr << "Error saving results" << std::endl;
             }
