@@ -125,7 +125,7 @@ void setDisplayPCD(Eigen::MatrixXd &pcdInMatrix, const Eigen::RowVector3d &color
     }
 }
 
-std::thread registrationThread([viewer] {
+std::thread registrationThread([&] {
     constexpr int WARM_UP_FRAME_COUNT = 20;
 
     int warmUPFrameRemaining = WARM_UP_FRAME_COUNT;

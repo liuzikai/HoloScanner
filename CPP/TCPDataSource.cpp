@@ -9,6 +9,8 @@
 #include "EigenHelpers.h"
 #include "TCPDataSource.h"
 
+using namespace DirectX;
+
 TCPDataSource::TCPDataSource(std::function<void()> stopCallBack) :
         socketServer(tcpIOContext, PORT, [](auto s) {
             // Setup a server with automatic acceptance
