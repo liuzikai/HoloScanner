@@ -1,4 +1,4 @@
-HoloScanner: In-Hand Scanning with Hololens 2 for Irregular Geometries
+HoloScanner: In-Hand Scanning with HoloLens 2 for Irregular Geometries
 ======================================================================
 
 An end-to-end system for in-hand scanning and near-real-time reconstruction of irregular geometries based on Microsoft
