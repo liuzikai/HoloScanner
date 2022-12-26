@@ -49,7 +49,6 @@ endif ()
 
 # Pipeline: DepthToPCD
 add_executable(DepthToPCD
-#        CPP/FileDataSource.cpp
         CPP/DepthProcessor.cpp
         CPP/Pipelines/DepthToPCD.cpp
         CPP/Registrator.cpp
@@ -64,3 +63,13 @@ if (TARGET libTCPServer)
     target_compile_definitions(DepthToPCD PUBLIC BOOST_AVAILABLE)
 endif ()
 target_compile_definitions(DepthToPCD PUBLIC "DATA_FOLDER=\"${DATA_FOLDER}\"")
+
+# Pipeline: XYZViewer
+add_executable(XYZViewer
+        CPP/Pipelines/XYZViewer.cpp
+        CPP/XYZLoader.cpp
+        )
+target_link_libraries(XYZViewer
+        ${LIGIGL_LIBERIES}
+        Open3D::Open3D
+        )

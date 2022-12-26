@@ -228,7 +228,7 @@ void Registrator::saveReconstructedMesh() {
     open3d::io::WritePointCloudToXYZ(afterSBScanPCDFilename.string(), *m_pcd, {});
 #endif
 
-    std::shared_ptr<open3d::geometry::TriangleMesh> mesh;
+    /*std::shared_ptr<open3d::geometry::TriangleMesh> mesh;
     std::vector<double> densities;
 
     float scale = 3;
@@ -238,7 +238,7 @@ void Registrator::saveReconstructedMesh() {
     // Save final mesh
     auto meshFilename = dataFolder / "Poisson.ply";
     std::cout << "Writing mesh to " << meshFilename << std::endl;
-    io::WriteTriangleMesh(meshFilename.string(), *mesh);
+    io::WriteTriangleMesh(meshFilename.string(), *mesh);*/
 }
 
 std::string Registrator::currentTimeString() {

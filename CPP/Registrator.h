@@ -14,7 +14,7 @@
 
 
 //#define USE_DBSCAN
-#define FINAL_DBSCAN
+//#define FINAL_DBSCAN
 
 class Registrator {
 public:
